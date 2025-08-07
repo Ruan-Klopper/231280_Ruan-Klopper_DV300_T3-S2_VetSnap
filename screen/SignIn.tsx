@@ -1,0 +1,168 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Image,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+
+const SignIn = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const navigation = useNavigation();
+
+  return (
+    <View style={styles.container}>
+      {/* Logo */}
+      <View style={styles.logoWrapper}>
+        <Image
+          source={require("../assets/logos/VetSnapLogo.png")} // Replace with actual logo path
+          style={styles.logo}
+        />
+      </View>
+
+      {/* Welcome Text */}
+      <Text style={styles.welcome}>Welcome back to</Text>
+      <Text style={styles.appName}>VetSnap</Text>
+
+      {/* Email Input */}
+      <Text style={styles.label}>Email</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="you@example.com"
+        placeholderTextColor="#A5CE67"
+        value={email}
+        onChangeText={setEmail}
+      />
+
+      {/* Password Input */}
+      <Text style={styles.label}>Password</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="••••••••"
+        placeholderTextColor="#A5CE67"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      {/* Continue Button */}
+      <Pressable style={styles.continueBtn}>
+        <Text style={styles.continueText}>Continue</Text>
+      </Pressable>
+
+      {/* OR divider */}
+      <Text style={styles.orText}>or</Text>
+
+      {/* Google Sign-in */}
+      <Pressable style={styles.googleBtn}>
+        <Ionicons name="logo-google" size={20} color="black" />
+        <Text style={styles.googleText}>Sign In with Google</Text>
+      </Pressable>
+
+      {/* Sign Up Link */}
+      <Text style={styles.signupText}>
+        Don’t have an account{" "}
+        <Text
+          style={styles.signupLink}
+          onPress={() => navigation.navigate("SignUp")}
+        >
+          Sign Up
+        </Text>
+      </Text>
+    </View>
+  );
+};
+
+export default SignIn;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FDEB",
+    paddingHorizontal: 30,
+    justifyContent: "center",
+  },
+  logoWrapper: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    resizeMode: "contain",
+  },
+  welcome: {
+    fontSize: 20,
+    textAlign: "center",
+    color: "#A5CE67",
+    marginBottom: 4,
+  },
+  appName: {
+    fontSize: 26,
+    fontWeight: "600",
+    color: "#73C860",
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  label: {
+    marginTop: 10,
+    fontSize: 14,
+    color: "#73C860",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#73C860",
+    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    color: "#73C860",
+    marginBottom: 8,
+  },
+  continueBtn: {
+    backgroundColor: "#FEEB3D",
+    paddingVertical: 14,
+    borderRadius: 30,
+    marginTop: 16,
+    alignItems: "center",
+  },
+  continueText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  orText: {
+    textAlign: "center",
+    color: "#444",
+    marginVertical: 12,
+  },
+  googleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderColor: "#000",
+    borderWidth: 1,
+    borderRadius: 30,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  googleText: {
+    fontSize: 15,
+    color: "#000",
+  },
+  signupText: {
+    marginTop: 40,
+    textAlign: "center",
+    color: "#333",
+    fontSize: 14,
+  },
+  signupLink: {
+    color: "#2E2E2E",
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+});
