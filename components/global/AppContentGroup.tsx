@@ -58,7 +58,11 @@ const AppContentGroup: React.FC<AppContentGroupProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <TopGroupWrapper>
         <View style={styles.topGroupContainer}>{headerComponents}</View>
         <LinearGradient

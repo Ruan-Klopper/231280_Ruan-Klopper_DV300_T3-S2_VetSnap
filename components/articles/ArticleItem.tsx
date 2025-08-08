@@ -25,6 +25,11 @@ const ArticleItem = ({ title, categories, image, source }: Props) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
+  // Limit to first 5 categories, add "..." if more
+  const maxVisible = 3;
+  const visibleCategories = categories.slice(0, maxVisible);
+  const hasMore = categories.length > maxVisible;
+
   const Content = () => (
     <>
       <LinearGradient
@@ -36,11 +41,16 @@ const ArticleItem = ({ title, categories, image, source }: Props) => {
 
       {/* Categories */}
       <View style={styles.tagsContainer}>
-        {categories.map((cat) => (
-          <View key={cat} style={styles.tag}>
+        {visibleCategories.map((cat, index) => (
+          <View key={`${cat}-${index}`} style={styles.tag}>
             <Text style={styles.tagText}>{cat}</Text>
           </View>
         ))}
+        {hasMore && (
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>...</Text>
+          </View>
+        )}
       </View>
 
       {/* Title + Source */}
