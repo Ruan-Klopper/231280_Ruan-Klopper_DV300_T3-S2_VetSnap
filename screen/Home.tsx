@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import AppHeader from "../components/global/AppHeader";
 import AppContentGroup from "../components/global/AppContentGroup";
 import AppNavigation from "../components/global/AppNavigation";
@@ -15,6 +15,7 @@ import PromotionalBlock from "../components/home/PromotionalBlock";
 // Media and content
 import promoImage1 from "../assets/images/vetsnap1.png";
 import promoImage2 from "../assets/images/vetsnap2.png";
+import { GetCurrentUserData } from "../services/auth/authService";
 
 const HeaderComponents = () => {
   const [username, setUsername] = useState("Ruan");
@@ -32,10 +33,26 @@ const HeaderComponents = () => {
 };
 
 const Home = () => {
+  const [user, setUser] = React.useState<any>(null);
+  const navigation = useNavigation();
+
+  React.useEffect(() => {
+    (async () => {
+      const res = await GetCurrentUserData();
+      if (res.success) {
+        setUser(res.data);
+      }
+    })();
+  }, []);
   return (
     <View style={globalStyles.root}>
       {/* Header */}
-      <AppHeader variant={2} title="VetSnap" />
+      <AppHeader
+        title="VetSnap"
+        userAvatarUrl={user?.photoURL}
+        userName={user?.fullName}
+        onProfilePress={() => navigation.navigate("Chat")}
+      />
 
       {/* Content Area */}
       <AppContentGroup

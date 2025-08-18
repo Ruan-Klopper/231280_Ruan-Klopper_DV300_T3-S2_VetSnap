@@ -205,11 +205,17 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           />
         </Pressable>
       )}
+
       <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
         <Ionicons name="notifications-outline" size={24} color="white" />
       </Pressable>
+
       <Pressable style={styles.profileButton} onPress={onProfilePress}>
-        <Ionicons name="person" size={22} color="black" />
+        {userAvatarUrl ? (
+          <Image source={{ uri: userAvatarUrl }} style={styles.profileAvatar} />
+        ) : (
+          <Ionicons name="person" size={22} color="black" />
+        )}
       </Pressable>
     </View>
   );
@@ -380,5 +386,10 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontWeight: "800",
+  },
+  profileAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
 });

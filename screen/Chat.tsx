@@ -13,7 +13,12 @@ import {
   KeyboardAvoidingView,
   Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/global/AppHeader";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -90,6 +95,10 @@ const Bubble = ({ item }: { item: ChatMessage }) => {
 
 /* ---------- Screen ---------- */
 export default function Chat() {
+  const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
+  const [headerHeight, setHeaderHeight] = useState(0);
+
   /* Seeded messages */
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -188,17 +197,19 @@ export default function Chat() {
   /* ---- Render ---- */
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
-      <AppHeader
-        variant={4}
-        userAvatarUrl="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80"
-        userName="Jane Johnson"
-        isOnline
-      />
+      <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
+        <AppHeader
+          variant={4}
+          userAvatarUrl="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80"
+          userName="Jane Johnson"
+          isOnline
+        />
+      </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.flex}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={insets.top + headerHeight}
       >
         <FlatList
           ref={listRef}
@@ -207,25 +218,44 @@ export default function Chat() {
           renderItem={Bubble}
           contentContainerStyle={styles.chatContent}
           inverted
+          keyboardShouldPersistTaps="handled"
         />
 
         {/* -------- Input Row -------- */}
-        <View style={styles.inputRow}>
-          <Pressable style={styles.mediaBtn}>
-            <Text style={styles.mediaIcon}>🖼️</Text>
+        <View
+          style={[
+            styles.inputRow,
+            { marginBottom: Math.max(8, insets.bottom) - 20 }, // keep negative offset compensation
+          ]}
+        >
+          {/* Media button (circle) */}
+          <Pressable style={styles.circleBtn} onPress={() => {}}>
+            <Ionicons name="image-outline" size={22} color="#111" />
+          </Pressable>
+          {/* Text input pill */}
+          <View style={styles.textPill}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type message"
+              placeholderTextColor="#A6CE39"
+              value={input}
+              onChangeText={setInput}
+              onSubmitEditing={sendMessage}
+              returnKeyType="send"
+            />
+          </View>
+
+          {/* Send button (circle) */}
+          <Pressable onPress={sendMessage} style={styles.circleBtn}>
+            <Ionicons name="send" size={22} color="#111" />
           </Pressable>
 
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type message"
-            value={input}
-            onChangeText={setInput}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
-
-          <Pressable onPress={sendMessage} style={styles.sendBtn}>
-            <Text style={styles.sendIcon}>➤</Text>
+          {/* Back button (circle) */}
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.circleBtn}
+          >
+            <Ionicons name="arrow-back" size={22} color="#111" />
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -265,15 +295,28 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    margin: 16,
-    paddingHorizontal: 12,
-    backgroundColor: "#fff",
-    borderRadius: 50,
-    elevation: 1,
+    margin: 10,
+    gap: 5,
+    borderRadius: 40,
+    padding: 7,
   },
   mediaBtn: { padding: 10 },
-  mediaIcon: { fontSize: 18 },
-  textInput: { flex: 1, fontSize: 16, paddingVertical: 10 },
-  sendBtn: { padding: 10 },
-  sendIcon: { fontSize: 18, fontWeight: "bold", color: "#4CAF50" },
+  circleBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  circleIcon: { fontSize: 18, color: "#111" },
+  textPill: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    paddingHorizontal: 16,
+    height: 48,
+    justifyContent: "center",
+  },
+  textInput: { flex: 1, fontSize: 16, paddingVertical: 0 },
 });

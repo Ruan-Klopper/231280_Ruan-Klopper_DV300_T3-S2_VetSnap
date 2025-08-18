@@ -5,184 +5,216 @@ import {
   TextInput,
   Switch,
   Pressable,
+  ScrollView,
+  Image,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { globalStyles } from "../global/styles";
 import AppHeader from "../components/global/AppHeader";
 import AppContentGroup from "../components/global/AppContentGroup";
-import AppNavigation from "../components/global/AppNavigation";
 import LoadingIndicator from "../components/global/LoadingIndicator";
-import ArticleGroup from "../components/articles/ArticleGroup";
-import ArticleItem from "../components/articles/ArticleItem";
+import {
+  DeleteAccount,
+  GetCurrentUserData,
+  Logout,
+  UpdateOwnProfile,
+} from "../services/auth/authService";
 
-const articles = [
-  {
-    id: "1",
-    title: "Chapter 15: Amoebic infections",
-    categories: ["Muscidae", "Stomoxyinae", "Fanniinae"],
-    image:
-      "https://media.wired.com/photos/593261cab8eb31692072f129/3:2/w_2560%2Cc_limit/85120553.jpg",
-  },
-  {
-    id: "2",
-    title: "Chapter 16: Viral infections",
-    categories: ["Retroviridae", "Flaviviridae"],
-    image:
-      "https://www.worldanimalprotection.org/cdn-cgi/image/width=1920,format=auto/globalassets/images/elephants/1033551-elephant.jpg",
-  },
-  {
-    id: "3",
-    title: "Chapter 17: Bacterial infections",
-    categories: ["Bacillaceae", "Enterobacteriaceae"],
-    image:
-      "https://www.aaha.org/wp-content/uploads/2024/03/b5e516f1655346558958c939e85de37a.jpg",
-  },
-];
-
-const HeaderComponents = () => {
-  const [username, setUsername] = useState("Ruan Klopper");
-  const [role, setRole] = useState("Student");
-  return (
-    <>
-      <Text style={[styles.headerText]}>{username}</Text>
-      <Text style={styles.headerSubText}>{role}</Text>
-    </>
-  );
-};
-
-const UserProfile = () => {
+const UserProfile = ({ navigation }: any) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false); // ✅ new state
+
+  const [user, setUser] = useState<any>(null);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  const [chatNotifs, setChatNotifs] = useState(false);
+  const [marketingNotifs, setMarketingNotifs] = useState(false);
 
   useEffect(() => {
-    // Simulate loading delay
-    const timeout = setTimeout(() => {
+    (async () => {
+      const res = await GetCurrentUserData();
+      if (res.success) {
+        const u = res.data;
+        setUser(u);
+        setFullName(u.fullName);
+        setEmail(u.email);
+        setChatNotifs(u.preferences?.notifications?.chat ?? false);
+        setMarketingNotifs(u.preferences?.notifications?.marketing ?? false);
+      }
       setIsLoading(false);
-    }, 2000);
-
-    return () => clearTimeout(timeout); // cleanup
+    })();
   }, []);
+
+  const handleUpdate = async () => {
+    setIsUpdating(true); // start spinner
+    try {
+      const res = await UpdateOwnProfile({ fullName });
+      if (res.success) {
+        setUser(res.data);
+        setDirty(false);
+        alert("Profile updated!");
+      } else {
+        alert("Update failed: " + res.message);
+      }
+    } finally {
+      setIsUpdating(false); // stop spinner
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[globalStyles.root, { justifyContent: "center" }]}>
+        <LoadingIndicator progress={50} message="Loading profile..." />
+      </View>
+    );
+  }
 
   return (
     <View style={globalStyles.root}>
-      {/* Header */}
-      <AppHeader variant={2} title="Your profile 1" />
+      {/* ✅ Header */}
+      <AppHeader
+        variant={2}
+        title="Profile"
+        userAvatarUrl={user?.photoURL}
+        userName={user?.fullName}
+        onProfilePress={() => {}}
+      />
 
-      {/* Content Area */}
-      <AppContentGroup headerComponents={<HeaderComponents />}>
-        <View
-          style={[
-            globalStyles.globalContentBlock,
-            globalStyles.globalContentBlockPadding,
-          ]}
-        >
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.subtitle}>See your</Text>
-              <Text style={styles.heading}>Saved Articles</Text>
+      <ScrollView>
+        <AppContentGroup
+          headerBackground={{
+            type: "image",
+            value: user?.photoURL,
+          }}
+          headerComponents={
+            <View style={styles.profileCard}>
+              <Image
+                source={{ uri: user?.photoURL }}
+                style={styles.profileImage}
+              />
+              <Text style={styles.headerText}>{user?.fullName}</Text>
+              <Text style={styles.headerSubText}>{user?.role}</Text>
             </View>
-          </View>
-          <View style={{ gap: 10 }}>
-            {isLoading ? (
-              <LoadingIndicator progress={42} message="Loading articles..." />
-            ) : (
-              articles.map((item) => (
-                <ArticleItem
-                  key={item.id}
-                  title={item.title}
-                  categories={item.categories}
-                  image={item.image}
-                />
-              ))
-            )}
-            {/* Add view more, to view more than 3 */}
-          </View>
-        </View>
+          }
+        >
+          <View style={{ gap: 12 }}>
+            {/* 🔹 Saved Articles */}
+            <View
+              style={[
+                globalStyles.globalContentBlock,
+                globalStyles.globalContentBlockPadding,
+              ]}
+            >
+              <Text style={styles.cardTitle}>Saved Articles</Text>
+              <Text style={styles.cardHint}>Coming soon...</Text>
+            </View>
 
-        <View
-          style={[
-            globalStyles.globalContentBlock,
-            globalStyles.globalContentBlockPadding,
-          ]}
-        >
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.subtitle}>View or Change</Text>
-              <Text style={styles.heading}>Personal Particulars</Text>
-            </View>
-          </View>
-          <View style={styles.block}>
-            <TextInput
-              value="Ruan Klopper"
-              editable={false}
-              style={styles.input}
-              placeholderTextColor="#A5CE67"
-            />
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value="231280@virtualwindow.co.za"
-              editable={false}
-              style={styles.input}
-              placeholderTextColor="#A5CE67"
-            />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value="Hidden"
-              secureTextEntry={true}
-              editable={false}
-              style={styles.input}
-              placeholderTextColor="#A5CE67"
-            />
-          </View>
-        </View>
+            {/* 🔹 Personal Info */}
+            <View
+              style={[
+                globalStyles.globalContentBlock,
+                globalStyles.globalContentBlockPadding,
+              ]}
+            >
+              <Text style={styles.cardTitle}>Personal Info</Text>
 
-        <View
-          style={[
-            globalStyles.globalContentBlock,
-            globalStyles.globalContentBlockPadding,
-          ]}
-        >
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.subtitle}>View or Change</Text>
-              <Text style={styles.heading}>Settings</Text>
-            </View>
-          </View>
-          <View style={styles.block}>
-            {[
-              { label: "Receive push emails", color: "#D1D1D1" },
-              { label: "Other setting", color: "#D1D1D1" },
-              { label: "Other setting", color: "#D1D1D1" },
-              { label: "Other setting", color: "#D1D1D1" },
-              { label: "Other setting", color: "#FFA24D" },
-            ].map((setting, index) => (
-              <View key={index} style={styles.settingRow}>
-                <Text style={styles.settingLabel}>{setting.label}</Text>
-                <View
-                  style={[
-                    styles.toggleIndicator,
-                    { backgroundColor: setting.color },
-                  ]}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                  value={fullName}
+                  onChangeText={(txt) => {
+                    setFullName(txt);
+                    setDirty(true);
+                  }}
+                  style={styles.input}
                 />
               </View>
-            ))}
 
-            <Pressable style={styles.optionBtn}>
-              <Text style={styles.optionBtnText}>Clear saved history</Text>
-            </Pressable>
-            <Pressable style={styles.optionBtn}>
-              <Text style={styles.optionBtnText}>Manage Payments</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.optionBtn, { backgroundColor: "#EAEAEA" }]}
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  value={email}
+                  editable={false} // keep immutable
+                  style={[styles.input, { backgroundColor: "#EEE" }]}
+                />
+              </View>
+
+              {dirty && (
+                <Pressable
+                  style={[styles.updateBtn, isUpdating && { opacity: 0.6 }]}
+                  onPress={handleUpdate}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? (
+                    <LoadingIndicator progress={50} message="Updating..." />
+                  ) : (
+                    <Text style={styles.updateBtnText}>Update Profile</Text>
+                  )}
+                </Pressable>
+              )}
+            </View>
+
+            {/* 🔹 Settings */}
+            <View
+              style={[
+                globalStyles.globalContentBlock,
+                globalStyles.globalContentBlockPadding,
+              ]}
             >
-              <Text style={[styles.optionBtnText]}>Log out of VetSnap</Text>
-            </Pressable>
-            <Pressable style={styles.deleteBtn}>
-              <Text style={styles.deleteBtnText}>Delete account</Text>
-            </Pressable>
+              <Text style={styles.cardTitle}>Settings</Text>
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Chat Notifications</Text>
+                <Switch value={chatNotifs} onValueChange={setChatNotifs} />
+              </View>
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Marketing Notifications</Text>
+                <Switch
+                  value={marketingNotifs}
+                  onValueChange={setMarketingNotifs}
+                />
+              </View>
+              <View style={styles.settingRow}>
+                <Text style={styles.settingLabel}>Theme</Text>
+                <Text style={styles.valueText}>{user?.preferences?.theme}</Text>
+              </View>
+
+              {/* Actions */}
+              <Pressable style={styles.optionBtn}>
+                <Text style={styles.optionBtnText}>Clear Saved History</Text>
+              </Pressable>
+              <Pressable style={styles.optionBtn}>
+                <Text style={styles.optionBtnText}>Manage Payments</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.optionBtn, { backgroundColor: "#F2F2F2" }]}
+                onPress={async () => {
+                  await Logout();
+                  navigation.replace("Login");
+                }}
+              >
+                <Text style={[styles.optionBtnText, { color: "#444" }]}>
+                  Log out of VetSnap
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={async () => {
+                  const res = await DeleteAccount();
+                  if (res.success) {
+                    navigation.replace("Login");
+                  } else {
+                    alert("Failed to delete account: " + res.message);
+                  }
+                }}
+              >
+                <Text style={styles.deleteBtnText}>Delete Account</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </AppContentGroup>
+        </AppContentGroup>
+      </ScrollView>
     </View>
   );
 };
@@ -190,87 +222,113 @@ const UserProfile = () => {
 export default UserProfile;
 
 const styles = StyleSheet.create({
+  profileCard: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  profileImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   headerText: {
     color: "white",
-    fontSize: 32,
-    fontWeight: "800",
+    fontSize: 26,
+    fontWeight: "700",
   },
   headerSubText: {
-    color: "white",
-    fontSize: 24,
+    color: "#D9E7D5",
+    fontSize: 16,
+    marginTop: 2,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingBottom: 12,
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  heading: {
-    fontSize: 24,
-    fontWeight: "800",
-  },
-  subtitle: {
-    fontSize: 15,
-    fontWeight: "300",
-  },
-  block: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 20,
+  cardTitle: {
+    fontSize: 18,
     fontWeight: "700",
-    color: "#2E2E2E",
     marginBottom: 12,
+    color: "#333",
+  },
+  cardHint: {
+    color: "#777",
+    fontSize: 14,
+  },
+  fieldGroup: {
+    marginBottom: 14,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#555",
-    marginTop: 8,
+    color: "#888",
+    marginBottom: 4,
   },
   input: {
     backgroundColor: "#F9F9F6",
-    borderRadius: 25,
+    borderRadius: 12,
     paddingVertical: 10,
-    paddingHorizontal: 20,
-    color: "#A5CE67",
+    paddingHorizontal: 14,
+    color: "#333",
   },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: 6,
+    marginVertical: 10,
   },
   settingLabel: {
-    color: "#9AC341",
-    fontSize: 16,
+    color: "#333",
+    fontSize: 15,
+    fontWeight: "500",
   },
-  toggleIndicator: {
-    width: 40,
-    height: 20,
-    borderRadius: 12,
+  valueText: {
+    fontWeight: "600",
+    color: "#444",
   },
   optionBtn: {
     backgroundColor: "#F9F9F6",
-    borderRadius: 30,
+    borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
     marginTop: 12,
   },
   optionBtnText: {
-    color: "#9AC341",
-    fontSize: 16,
+    color: "#4A8C2C",
+    fontSize: 15,
+    fontWeight: "600",
   },
   deleteBtn: {
-    backgroundColor: "#FFD69F",
-    borderRadius: 30,
+    backgroundColor: "#FFE5D9",
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 16,
   },
   deleteBtnText: {
-    color: "#9AC341",
-    fontWeight: "600",
+    color: "#C0392B",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  updateBtn: {
+    marginTop: 10,
+    backgroundColor: "#4A8C2C",
+    paddingVertical: 12,
+    borderRadius: 15,
+    alignItems: "center",
+  },
+  updateBtnText: {
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 16,
   },
 });
