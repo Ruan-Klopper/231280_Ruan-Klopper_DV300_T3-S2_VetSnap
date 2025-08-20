@@ -1,3 +1,4 @@
+// /components/global/AppNavigation.tsx
 import React, { useRef, useEffect } from "react";
 import {
   StyleSheet,
@@ -11,8 +12,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-
-type TabKey = "home" | "search" | "book" | "chat" | "profile";
+import type { TabKey } from "./TabContext"; // 👈 use the shared TabKey
 
 type AppNavigationProps = {
   activeTab: TabKey;
@@ -24,6 +24,7 @@ type AppNavigationProps = {
   }[];
 };
 
+// 👇 Ensure the order puts Pulse in the middle (3rd of 5)
 const defaultTabs: {
   key: TabKey;
   icon: keyof typeof Ionicons.glyphMap;
@@ -37,6 +38,12 @@ const defaultTabs: {
     navigateTo: "BrowseArticles",
     displayName: "Browse",
   },
+  {
+    key: "pulse",
+    icon: "pulse",
+    navigateTo: "AllPulses",
+    displayName: "Pulse",
+  }, // 👈 NEW
   {
     key: "chat",
     icon: "chatbox-ellipses",
@@ -121,9 +128,7 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
                 ]}
               >
                 <Pressable
-                  onPress={() => {
-                    onTabChange?.(tab.key);
-                  }}
+                  onPress={() => onTabChange?.(tab.key)}
                   style={({ pressed }) => [
                     styles.pressableArea,
                     pressed && Platform.OS === "ios" && { opacity: 0.8 },

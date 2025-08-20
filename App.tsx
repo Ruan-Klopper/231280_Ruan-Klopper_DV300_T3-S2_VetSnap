@@ -91,6 +91,8 @@ export default function App() {
                   component={ArticleSingleView}
                 />
                 <Stack.Screen name="Chat" component={Chat} />
+                <Stack.Screen name="YourPulses" component={YourPulses} />
+                <Stack.Screen name="CreatePulse" component={CreatePulse} />
               </>
             )}
           </Stack.Navigator>

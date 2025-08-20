@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 type PulseCategory = "alert" | "tips" | "suggestion";
 
-export type PulseCardProps = {
+export type YourPulseCardProps = {
   postId: string;
   category: PulseCategory;
   title: string;
@@ -24,6 +24,8 @@ export type PulseCardProps = {
   pulseCount?: number; // optional (only shown if provided)
   onPressPulse?: (postId: string, nextState: boolean) => void;
   onPressCard?: (postId: string) => void;
+  onEdit?: (postId: string) => void; // NEW
+  onDelete?: (postId: string) => void; // NEW
   style?: ViewStyle;
 };
 
@@ -53,7 +55,7 @@ const formatDateTime = (d: Date | string | number) => {
   return `${dd} ${MMM} ${yyyy} - ${hh}h${mm}`;
 };
 
-const PulseCard: React.FC<PulseCardProps> = ({
+const YourPulseCard: React.FC<YourPulseCardProps> = ({
   postId,
   category,
   title,
@@ -66,6 +68,8 @@ const PulseCard: React.FC<PulseCardProps> = ({
   pulseCount,
   onPressPulse,
   onPressCard,
+  onEdit,
+  onDelete,
   style,
 }) => {
   const isAlert = category === "alert";
@@ -173,12 +177,43 @@ const PulseCard: React.FC<PulseCardProps> = ({
           </Text>
           <Text style={styles.date}>{dateText}</Text>
         </View>
+
+        {/* NEW: Actions row (Edit / Delete) */}
+        <View style={styles.actionsRow}>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onEdit?.(postId);
+            }}
+            style={({ pressed }) => [
+              styles.editBtn,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <Ionicons name="create-outline" size={16} color={BRAND_GREEN} />
+            <Text style={styles.editLabel}>Edit</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onDelete?.(postId);
+            }}
+            style={({ pressed }) => [
+              styles.deleteBtn,
+              pressed && { opacity: 0.92 },
+            ]}
+          >
+            <Ionicons name="trash-outline" size={16} color={ALERT_RED} />
+            <Text style={styles.deleteLabel}>Delete</Text>
+          </Pressable>
+        </View>
       </View>
     </Pressable>
   );
 };
 
-export default PulseCard;
+export default YourPulseCard;
 
 const styles = StyleSheet.create({
   card: {
@@ -287,5 +322,44 @@ const styles = StyleSheet.create({
   pulseFabActive: {
     backgroundColor: BRAND_GREEN,
     borderColor: BRAND_GREEN,
+  },
+
+  // NEW: actions
+  actionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  editBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: BRAND_GREEN,
+    backgroundColor: "#FFFFFF",
+  },
+  editLabel: {
+    color: BRAND_GREEN,
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "#FFE8E6",
+    borderWidth: 1.5,
+    borderColor: "#FFD1CD",
+  },
+  deleteLabel: {
+    color: ALERT_RED,
+    fontWeight: "800",
+    fontSize: 14,
   },
 });

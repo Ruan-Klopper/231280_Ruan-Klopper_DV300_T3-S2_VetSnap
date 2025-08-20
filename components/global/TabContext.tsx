@@ -1,7 +1,7 @@
 // components/global/TabContext.tsx
 import React, { createContext, useContext } from "react";
 
-export type TabKey = "home" | "search" | "book" | "chat" | "profile";
+export type TabKey = "home" | "book" | "pulse" | "chat" | "profile" | "search";
 
 type TabContextType = {
   setActiveTab: (key: TabKey) => void;

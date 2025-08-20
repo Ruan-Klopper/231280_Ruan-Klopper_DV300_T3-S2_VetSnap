@@ -1,3 +1,4 @@
+// /navigation/MainTabs.tsx (or wherever this file lives)
 import React, { useState } from "react";
 import { View } from "react-native";
 import Home from "../screen/Home";
@@ -9,22 +10,21 @@ import AllPulses from "../screen/AllPulses";
 import AppNavigation from "../components/global/AppNavigation";
 import { TabContext, TabKey } from "../components/global/TabContext";
 
-const screens = {
+const screens: Record<TabKey, React.ComponentType<any>> = {
   home: Home,
   book: BrowseArticles,
+  pulse: AllPulses, // 👈 NEW: Pulse page
   chat: AllChats,
   profile: UserProfile,
-  ?: AllPulses,
+  search: Search, // (kept for completeness; not in bottom bar by default)
 };
 
 export const MainTabs = () => {
   const [activeTab, setActiveTab] = useState<TabKey>("home");
-  console.log("CURRENT", activeTab);
-
   const ActiveScreen = screens[activeTab];
-  console.log(ActiveScreen);
 
-  const rootScreens: TabKey[] = ["home", "book", "chat", "profile"];
+  // 👇 Make Pulse a root screen so the back button hides on it
+  const rootScreens: TabKey[] = ["home", "book", "pulse", "chat", "profile"];
   const showBackButton = !rootScreens.includes(activeTab);
 
   return (
