@@ -17,6 +17,8 @@ import { auth } from "./config/firebase"; // <- update path if different
 // Screens
 import ArticleSingleView from "./screen/ArticleSingleView";
 import Chat from "./screen/Chat";
+import YourPulses from "./screen/YourPulses";
+import CreatePulse from "./screen/CreatePulse";
 import SignIn from "./screen/SignIn";
 import SignUp from "./screen/SignUp";
 

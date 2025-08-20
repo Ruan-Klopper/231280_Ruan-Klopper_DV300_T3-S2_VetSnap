@@ -5,15 +5,16 @@ import Search from "../screen/Search";
 import BrowseArticles from "../screen/BrowseArticles";
 import AllChats from "../screen/AllChats";
 import UserProfile from "../screen/UserProfile";
+import AllPulses from "../screen/AllPulses";
 import AppNavigation from "../components/global/AppNavigation";
 import { TabContext, TabKey } from "../components/global/TabContext";
 
 const screens = {
   home: Home,
-  search: Search,
   book: BrowseArticles,
   chat: AllChats,
   profile: UserProfile,
+  ?: AllPulses,
 };
 
 export const MainTabs = () => {
@@ -23,7 +24,7 @@ export const MainTabs = () => {
   const ActiveScreen = screens[activeTab];
   console.log(ActiveScreen);
 
-  const rootScreens: TabKey[] = ["home", "search", "book", "chat", "profile"];
+  const rootScreens: TabKey[] = ["home", "book", "chat", "profile"];
   const showBackButton = !rootScreens.includes(activeTab);
 
   return (

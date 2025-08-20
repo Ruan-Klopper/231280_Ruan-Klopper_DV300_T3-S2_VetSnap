@@ -11,16 +11,22 @@ export const GET_ALL_ARTICLES = `
   }
 `;
 
-export const GET_ARTICLE_BY_ID = `
-  query GET_ARTICLE_BY_ID($id: string) {
-    "article": *[_type == "article" && _id == $id][0] {
-      _id,
-      title,
-      source,
-      keywords,
-      documentId,
-      coverImage,
-      sections
-    }
+// queries.ts
+export const GET_ARTICLE_BY_ID = (id: string) => {
+  if (!id) {
+    console.warn("⚠️ GET_ARTICLE_BY_ID called with empty id");
   }
-`;
+
+  return `
+  *[_type == "article" && _id == ${JSON.stringify(id)}][0]{
+    _id,
+    title,
+    author,
+    source,
+    keywords,
+    documentId,
+    coverImage,
+    sections
+  }
+`.trim();
+};

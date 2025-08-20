@@ -1,6 +1,6 @@
 // services/sanity/sanityService.ts
 
-import { sanityClient } from "./api";
+import { sanityClient } from "./sanityClient";
 import { GET_ALL_ARTICLES, GET_ARTICLE_BY_ID } from "./queries";
 import { getBannerImagePath } from "./utils";
 import { ApiResponse, Article } from "./interfaces";
@@ -48,24 +48,29 @@ export const filterArticles = (
   });
 };
 
-export const getArticleById = async (
-  id: string
-): Promise<ApiResponse<Article>> => {
+export async function getArticleById(id: string): Promise<ApiResponse<any>> {
   try {
-    const data: Article = await sanityClient.fetch(GET_ARTICLE_BY_ID, { id });
+    console.log("🟡 getArticleById() called with id:", id);
 
-    return {
-      success: true,
-      statusCode: 200,
-      message: "Article retrieved successfully",
-      data,
-    };
-  } catch (error) {
+    // build query string with the id interpolated
+    const query = GET_ARTICLE_BY_ID(id);
+    console.log("🟡 GROQ Query String:", query);
+
+    const data = await sanityClient.fetch(query);
+    console.log("🟢 Sanity fetch result:", data);
+
+    if (!data) {
+      return { success: false, statusCode: 404, message: "Not found" };
+    }
+
+    return { success: true, statusCode: 200, message: "OK", data };
+  } catch (err: any) {
+    console.error("🔴 Sanity fetch error:", err?.message || err);
     return {
       success: false,
       statusCode: 500,
       message: "Failed to retrieve article",
-      error: (error as Error).message,
+      error: String(err?.message || err),
     };
   }
-};
+}

@@ -1,3 +1,4 @@
+// components/articles/ArticleItem.tsx
 import {
   ImageBackground,
   Pressable,
@@ -11,6 +12,8 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 type Props = {
+  id: string; // Sanity _id
+  documentId?: number; // numeric doc id (optional)
   title: string;
   categories: string[];
   image?: string;
@@ -18,14 +21,21 @@ type Props = {
 };
 
 type RootStackParamList = {
-  ArticleSingleView: undefined;
+  ArticleSingleView: { id: string; documentId?: number };
 };
 
-const ArticleItem = ({ title, categories, image, source }: Props) => {
+const ArticleItem = ({
+  id,
+  documentId,
+  title,
+  categories,
+  image,
+  source,
+}: Props) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  // Limit to first 5 categories, add "..." if more
+  // ——— local Content component (was missing) ———
   const maxVisible = 3;
   const visibleCategories = categories.slice(0, maxVisible);
   const hasMore = categories.length > maxVisible;
@@ -67,7 +77,11 @@ const ArticleItem = ({ title, categories, image, source }: Props) => {
 
   return (
     <Pressable
-      onPress={() => navigation.navigate("ArticleSingleView")}
+      onPress={() => {
+        navigation.navigate("ArticleSingleView", { id, documentId });
+        console.log("ID", id);
+        console.log("DocumentID", documentId);
+      }}
       style={styles.card}
     >
       {image ? (
