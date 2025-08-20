@@ -1,5 +1,11 @@
 /* /screens/Chat.tsx */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
@@ -12,196 +18,328 @@ import {
   Platform,
   KeyboardAvoidingView,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
 import AppHeader from "../components/global/AppHeader";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const MAX_IMAGE_WIDTH = SCREEN_WIDTH * 0.75 - 32; // bubble width – padding
+// ─── Auth / User ───────────────────────────────────────────────────────────────
+import { GetCurrentUserData } from "../services/auth/authService";
+import { getUserById } from "../services/user/user.service";
+import type { AppUser } from "../interfaces/user";
 
-/* ---------- Types ---------- */
-export type ChatMessage = {
+// ─── Chat services (adjust names if needed) ───────────────────────────────────
+import { markConversationRead } from "../services/chat/conversations.service";
+import {
+  listenToMessages, // (conversationId, cb: (MessageDoc[]) => void) -> { success, data: () => void }
+  sendTextMessage, // (conversationId, text) -> Promise<{success:boolean, message?:string}>
+  sendImageMessage, // (conversationId, imageUrl, width?, height?) -> Promise<...>
+} from "../services/chat/messages.service";
+import {
+  uploadChatImage, // (conversationId, localUri) -> Promise<{success:boolean, url:string}>
+} from "../services/chat/storage.service";
+
+// ─── Layout constants ─────────────────────────────────────────────────────────
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
+const MAX_IMAGE_WIDTH = MAX_BUBBLE_WIDTH - 32;
+
+// ─── Route types ──────────────────────────────────────────────────────────────
+type ChatRouteParams = {
+  conversationId: string;
+  otherUserId?: string;
+  otherUserName?: string;
+  otherUserAvatar?: string;
+};
+type ChatRoute = RouteProp<{ Chat: ChatRouteParams }, "Chat">;
+
+// ─── Backend message shape (adjust to your messages.service) ──────────────────
+type MessageDoc = {
   id: string;
   text?: string;
   imageUrl?: string;
-  imageWidth?: number;
-  imageHeight?: number;
-  from: "user" | "bot";
-  timestamp: string; // HH:mm
+  senderId: string;
+  createdAt: number | Date; // Firestore Timestamp -> convert to ms/Date in service or here
 };
 
-/* ---------- Helpers ---------- */
-const now = () =>
-  new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+// ─── UI message shape ─────────────────────────────────────────────────────────
+type UiMessage = {
+  id: string;
+  text?: string;
+  imageUrl?: string;
+  imageW?: number;
+  imageH?: number;
+  fromMe: boolean;
+  timeLabel: string; // "HH:mm"
+};
 
-/* ---------- Message bubble ---------- */
-const Bubble = ({ item }: { item: ChatMessage }) => {
-  const { from, text, timestamp, imageUrl, imageWidth, imageHeight } = item;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const formatTime = (d: Date | number) => {
+  const date = typeof d === "number" ? new Date(d) : d;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
 
-  // scale image only when we know original dimensions
-  let scaledW = 0,
-    scaledH = 0;
-  if (imageUrl && imageWidth && imageHeight) {
-    const ratio = imageWidth / imageHeight;
-    if (imageWidth > MAX_IMAGE_WIDTH) {
-      scaledW = MAX_IMAGE_WIDTH - 14;
-      scaledH = MAX_IMAGE_WIDTH / ratio;
-    } else {
-      scaledW = imageWidth;
-      scaledH = imageHeight;
-    }
-  }
+// scale image within bubble constraints
+const scaleImage = (w: number, h: number) => {
+  if (!w || !h) return { w: 0, h: 0 };
+  const ratio = w / h;
+  const targetW = Math.min(w, MAX_IMAGE_WIDTH);
+  const targetH = targetW / ratio;
+  return { w: targetW, h: targetH };
+};
 
+// ─── Message bubble ───────────────────────────────────────────────────────────
+const Bubble: React.FC<{ msg: UiMessage }> = ({ msg }) => {
+  const { fromMe, text, timeLabel, imageUrl, imageW, imageH } = msg;
   return (
     <View
-      style={[
-        styles.bubbleWrapper,
-        from === "user" ? styles.alignRight : styles.alignLeft,
-      ]}
+      style={[styles.bubbleRow, fromMe ? styles.alignRight : styles.alignLeft]}
     >
       <View
-        style={[
-          styles.bubble,
-          from === "user" ? styles.userBubble : styles.botBubble,
-        ]}
+        style={[styles.bubble, fromMe ? styles.bubbleMe : styles.bubbleOther]}
       >
-        {imageUrl && !!scaledW && !!scaledH && (
+        {!!imageUrl && !!imageW && !!imageH && (
           <Image
             source={{ uri: imageUrl }}
             style={{
-              width: scaledW,
-              height: scaledH,
+              width: imageW,
+              height: imageH,
               borderRadius: 12,
-              marginBottom: 8,
+              marginBottom: text ? 8 : 0,
             }}
           />
         )}
-
-        {!!text && <Text style={styles.messageText}>{text}</Text>}
-
-        <Text style={styles.timestamp}>
-          {timestamp}
-          {from === "bot" && " • Received"}
-        </Text>
+        {!!text && <Text style={styles.bubbleText}>{text}</Text>}
+        <Text style={styles.bubbleMeta}>{timeLabel}</Text>
       </View>
     </View>
   );
 };
 
-/* ---------- Screen ---------- */
-export default function Chat() {
+// ─── Screen ───────────────────────────────────────────────────────────────────
+const Chat: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<ChatRoute>();
   const insets = useSafeAreaInsets();
+  const listRef = useRef<FlatList<UiMessage>>(null);
+
+  const { conversationId, otherUserId, otherUserName, otherUserAvatar } =
+    route.params;
+
+  // me
+  const [me, setMe] = useState<AppUser | null>(null);
+  const [bootLoading, setBootLoading] = useState(true);
+
+  // header
+  const [headerUser, setHeaderUser] = useState<{
+    name: string;
+    avatar?: string | null;
+  }>({
+    name: otherUserName || "Chat",
+    avatar: otherUserAvatar ?? null,
+  });
   const [headerHeight, setHeaderHeight] = useState(0);
 
-  /* Seeded messages */
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      text: "Here are some cows – first time I saw these things, wow!",
-      imageUrl:
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRUGaKQYijLVxRAa8LkWgRnOYGWwQvLB0eV9A&s",
-      from: "bot",
-      timestamp: "17:31",
-    },
-    {
-      id: "2",
-      text: "Got it!",
-      from: "bot",
-      timestamp: "17:31",
-    },
-    {
-      id: "3",
-      text: "Camels!",
-      imageUrl:
-        "https://hips.hearstapps.com/hmg-prod/images/headshot-of-giraffe-sabi-sands-game-reserve-royalty-free-image-1573571198.jpg",
-      from: "bot",
-      timestamp: "17:32",
-    },
-  ]);
-
+  // messages
+  const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [sending, setSending] = useState(false);
   const [input, setInput] = useState("");
-  const listRef = useRef<FlatList>(null);
 
-  const BUBBLE_PADDING = 24; // ⬅︎ keep in one place
-  const MAX_IMAGE_WIDTH = SCREEN_WIDTH * 0.75 - 12;
-
+  // ── Bootstrap: get me ───────────────────────────────────────────────────────
   useEffect(() => {
-    const withDimensions = async () => {
-      const mapped = await Promise.all(
-        messages.map(async (m) => {
-          if (m.imageUrl && !m.imageWidth && !m.imageHeight) {
+    let alive = true;
+    (async () => {
+      const res = await GetCurrentUserData();
+      if (!alive) return;
+      if (!res.success || !res.data) {
+        Alert.alert("Auth", res.message || "Failed to load user");
+        setBootLoading(false);
+        return;
+      }
+      setMe(res.data);
+      setBootLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ── Load peer profile if needed ─────────────────────────────────────────────
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (otherUserId && (!otherUserName || !otherUserAvatar)) {
+        const res = await getUserById(otherUserId);
+        if (alive && res.success && res.data) {
+          setHeaderUser({ name: res.data.fullName, avatar: res.data.photoURL });
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [otherUserId, otherUserName, otherUserAvatar]);
+
+  // ── Mark read on mount ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!conversationId) return;
+    // fire-and-forget; no await
+    markConversationRead(conversationId).catch(() => {});
+  }, [conversationId]);
+
+  // ── Subscribe to messages ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!conversationId || !me) return;
+    let unsub: null | (() => void) = null;
+
+    const res = listenToMessages(conversationId, async (docs: MessageDoc[]) => {
+      // Map backend docs -> UI messages
+      // Note: If your service already returns ms timestamps, keep as-is.
+      const ui = await Promise.all(
+        docs.map(async (m) => {
+          const created =
+            m.createdAt instanceof Date ? m.createdAt : new Date(m.createdAt);
+          let imageW: number | undefined;
+          let imageH: number | undefined;
+
+          if (m.imageUrl) {
             try {
               const { w, h } = await new Promise<{ w: number; h: number }>(
-                (res, rej) =>
-                  Image.getSize(m.imageUrl!, (w, h) => res({ w, h }), rej)
+                (resolve, reject) =>
+                  Image.getSize(
+                    m.imageUrl!,
+                    (w, h) => resolve({ w, h }),
+                    reject
+                  )
               );
-
-              const ratio = w / h;
-              const scaledW = w > MAX_IMAGE_WIDTH ? MAX_IMAGE_WIDTH : w;
-              const scaledH = scaledW / ratio;
-
-              return { ...m, imageWidth: scaledW, imageHeight: scaledH };
+              const s = scaleImage(w, h);
+              imageW = s.w;
+              imageH = s.h;
             } catch {
-              return m;
+              // ignore broken images
             }
           }
-          return m;
+
+          return {
+            id: m.id,
+            text: m.text,
+            imageUrl: m.imageUrl,
+            imageW,
+            imageH,
+            fromMe: m.senderId === me.userId,
+            timeLabel: formatTime(created),
+          } as UiMessage;
         })
       );
 
-      setMessages(mapped);
+      // We want newest at bottom visually -> use FlatList inverted with ascending array
+      // If your service returns ascending, fine; if descending, reverse here.
+      setMessages(ui);
+    });
+
+    if (res?.success && typeof res.data === "function") {
+      unsub = res.data;
+    }
+
+    return () => {
+      if (unsub) unsub();
     };
+  }, [conversationId, me]);
 
-    withDimensions();
-    /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, []);
-
-  /* ---- Auto-scroll on new messages ---- */
+  // ── Auto-scroll to latest when messages change ──────────────────────────────
   useEffect(() => {
+    // With inverted list, offset 0 = bottom (newest)
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, [messages]);
 
-  /* ---- Send message ---- */
-  const sendMessage = useCallback(() => {
-    if (!input.trim()) return;
+  // ── Send text message ───────────────────────────────────────────────────────
+  const onSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || !conversationId) return;
+    setSending(true);
     Keyboard.dismiss();
+    try {
+      const res = await sendTextMessage(conversationId, text);
+      if (!res?.success) {
+        Alert.alert("Chat", res?.message || "Failed to send message");
+      } else {
+        setInput("");
+      }
+    } catch (e: any) {
+      Alert.alert("Chat", e?.message || "Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  }, [conversationId, input]);
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      text: input.trim(),
-      from: "user",
-      timestamp: now(),
-    };
+  // ── Send image (hook up your picker) ────────────────────────────────────────
+  const onPickAndSendImage = useCallback(async () => {
+    if (!conversationId) return;
 
-    setMessages((prev) => [userMsg, ...prev]);
-    setInput("");
+    try {
+      // TODO: Integrate your picker (e.g., expo-image-picker) to get localUri
+      // const result = await ImagePicker.launchImageLibraryAsync({ ... });
+      // if (result.canceled) return;
+      // const localUri = result.assets[0].uri;
 
-    // mock bot reply
-    setTimeout(() => {
-      const botMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "Got it!",
-        from: "bot",
-        timestamp: now(),
-      };
-      setMessages((prev) => [botMsg, ...prev]);
-    }, 600);
-  }, [input]);
+      Alert.alert(
+        "Media",
+        "Hook up your picker and call uploadChatImage(localUri)."
+      );
+      return;
 
-  /* ---- Render ---- */
+      // Example flow after you have localUri:
+      // const up = await uploadChatImage(conversationId, localUri);
+      // if (!up.success) throw new Error("Upload failed");
+      // let w = 0, h = 0;
+      // try {
+      //   const dim = await new Promise<{ w: number; h: number }>((resolve, reject) =>
+      //     Image.getSize(up.url, (w, h) => resolve({ w, h }), reject)
+      //   );
+      //   w = dim.w; h = dim.h;
+      // } catch {}
+      // await sendImageMessage(conversationId, up.url, w, h);
+    } catch (e: any) {
+      Alert.alert("Image", e?.message || "Failed to send image");
+    }
+  }, [conversationId]);
+
+  // ── Render items ────────────────────────────────────────────────────────────
+  const renderItem = useCallback(({ item }: { item: UiMessage }) => {
+    return <Bubble msg={item} />;
+  }, []);
+
+  // ── Loading guard ───────────────────────────────────────────────────────────
+  if (bootLoading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["bottom"]}>
+        <View style={[styles.flex, styles.center]}>
+          <ActivityIndicator />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["bottom"]}>
       <View onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}>
         <AppHeader
           variant={4}
-          userAvatarUrl="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80"
-          userName="Jane Johnson"
+          recipientAvatarUrl={
+            headerUser.avatar ??
+            "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80"
+          }
+          userName={headerUser.name}
           isOnline
         />
       </View>
@@ -215,24 +353,23 @@ export default function Chat() {
           ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={Bubble}
+          renderItem={renderItem}
           contentContainerStyle={styles.chatContent}
           inverted
           keyboardShouldPersistTaps="handled"
         />
 
-        {/* -------- Input Row -------- */}
+        {/* ── Input bar ── */}
         <View
           style={[
             styles.inputRow,
-            { marginBottom: Math.max(8, insets.bottom) - 20 }, // keep negative offset compensation
+            { paddingBottom: Math.max(8, insets.bottom) },
           ]}
         >
-          {/* Media button (circle) */}
-          <Pressable style={styles.circleBtn} onPress={() => {}}>
+          <Pressable style={styles.circleBtn} onPress={onPickAndSendImage}>
             <Ionicons name="image-outline" size={22} color="#111" />
           </Pressable>
-          {/* Text input pill */}
+
           <View style={styles.textPill}>
             <TextInput
               style={styles.textInput}
@@ -240,17 +377,24 @@ export default function Chat() {
               placeholderTextColor="#A6CE39"
               value={input}
               onChangeText={setInput}
-              onSubmitEditing={sendMessage}
+              onSubmitEditing={onSend}
               returnKeyType="send"
+              editable={!sending}
             />
           </View>
 
-          {/* Send button (circle) */}
-          <Pressable onPress={sendMessage} style={styles.circleBtn}>
-            <Ionicons name="send" size={22} color="#111" />
+          <Pressable
+            onPress={onSend}
+            style={styles.circleBtn}
+            disabled={sending}
+          >
+            {sending ? (
+              <ActivityIndicator />
+            ) : (
+              <Ionicons name="send" size={22} color="#111" />
+            )}
           </Pressable>
 
-          {/* Back button (circle) */}
           <Pressable
             onPress={() => navigation.goBack()}
             style={styles.circleBtn}
@@ -261,46 +405,47 @@ export default function Chat() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
+};
 
-/* ---------- Styles ---------- */
+export default Chat;
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#f0f4ef" },
   flex: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center" },
+
   chatContent: {
     paddingHorizontal: 16,
-    // To counter for the header
     paddingBottom: 112,
     gap: 12,
     flexGrow: 1,
     justifyContent: "flex-end",
   },
 
-  /* Bubbles */
-  bubbleWrapper: { maxWidth: "75%" },
+  // bubbles
+  bubbleRow: { maxWidth: "75%" },
   alignLeft: { alignSelf: "flex-start" },
   alignRight: { alignSelf: "flex-end" },
   bubble: { borderRadius: 20, padding: 12 },
-  userBubble: { backgroundColor: "#DCF8C6" },
-  botBubble: { backgroundColor: "#E5E5EA" },
-  messageText: { fontSize: 16, color: "#111" },
-  timestamp: {
+  bubbleMe: { backgroundColor: "#DCF8C6" },
+  bubbleOther: { backgroundColor: "#E5E5EA" },
+  bubbleText: { fontSize: 16, color: "#111" },
+  bubbleMeta: {
     fontSize: 12,
     color: "#555",
     marginTop: 4,
     alignSelf: "flex-end",
   },
 
-  /* Input */
+  // input
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    margin: 10,
-    gap: 5,
-    borderRadius: 40,
-    padding: 7,
+    marginHorizontal: 10,
+    marginTop: 6,
+    gap: 6,
   },
-  mediaBtn: { padding: 10 },
   circleBtn: {
     width: 48,
     height: 48,
@@ -309,7 +454,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  circleIcon: { fontSize: 18, color: "#111" },
   textPill: {
     flex: 1,
     backgroundColor: "#FFFFFF",

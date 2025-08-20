@@ -14,13 +14,19 @@ type RootStackParamList = {
   Chat: undefined;
 };
 
-type ChatItemProps = {
+export type ChatItemProps = {
   name: string;
   time: string;
   message: string;
   avatarUrl: string;
   rating: number;
   isUnread: boolean;
+  // optional navigation params (used if onPress not provided)
+  navigationParams?: {
+    conversationId?: string;
+    otherUserId?: string;
+  };
+  onPress?: () => void;
 };
 
 const ChatItem: React.FC<ChatItemProps> = ({
@@ -30,19 +36,34 @@ const ChatItem: React.FC<ChatItemProps> = ({
   avatarUrl,
   rating,
   isUnread,
+  onPress,
+  navigationParams,
 }) => {
+  const handlePress = () => {
+    if (onPress) return onPress();
+    if (navigationParams?.conversationId) {
+      navigation.navigate("Chat" as any, navigationParams);
+    }
+  };
+
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
-    <Pressable onPress={() => navigation.navigate("Chat")}>
+    <Pressable onPress={handlePress}>
       <View
         style={[
           styles.container,
           isUnread ? styles.unreadBorder : styles.readBorder,
         ]}
       >
-        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        {!!avatarUrl && (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+          />
+        )}
+
         <View style={styles.ratingBadge}>
           <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
           <Text style={styles.star}>★</Text>

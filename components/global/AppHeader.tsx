@@ -38,6 +38,7 @@ type AppHeaderProps = {
   enableParticles?: boolean;
   topColor?: string;
   userAvatarUrl?: string;
+  recipientAvatarUrl?: string;
   userName?: string;
   isOnline?: boolean;
 };
@@ -58,6 +59,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   enableParticles = false,
   topColor = "#1D301E",
   userAvatarUrl,
+  recipientAvatarUrl,
   userName,
   isOnline,
 }) => {
@@ -156,7 +158,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
               <Ionicons name="arrow-back" size={24} color="white" />
             </Pressable>
             <View style={styles.chatUserInfo}>
-              {userAvatarUrl && (
+              {recipientAvatarUrl && (
                 <View style={styles.avatarWrapper}>
                   <View
                     style={[
@@ -168,7 +170,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                   />
                   <View style={styles.avatarBorder}>
                     <Image
-                      source={{ uri: userAvatarUrl }}
+                      source={{ uri: recipientAvatarUrl }}
                       style={styles.avatar}
                       resizeMode="cover"
                     />

@@ -8,12 +8,17 @@ type RootStackParamList = {
   Chat: undefined;
 };
 
-type NewChatItemProps = {
+export type NewChatItemProps = {
   name: string;
   position: string;
   imageUrl: string;
   rating: number;
-  isOnline: boolean;
+  // If provided, component can navigate after conversation creation by parent
+  navigationParams?: {
+    conversationId?: string;
+    otherUserId?: string;
+  };
+  onPress?: () => void; // usually starts the conversation in the parent
 };
 
 const NewChatItem: React.FC<NewChatItemProps> = ({
@@ -21,32 +26,36 @@ const NewChatItem: React.FC<NewChatItemProps> = ({
   position,
   imageUrl,
   rating,
-  isOnline,
+  onPress,
+  navigationParams,
 }) => {
+  const handlePress = () => {
+    if (onPress) return onPress();
+    if (navigationParams?.conversationId) {
+      navigation.navigate("Chat" as any, navigationParams);
+    }
+  };
+
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   return (
-    <Pressable
-      style={styles.container}
-      onPress={() => navigation.navigate("Chat")}
-    >
+    <Pressable style={styles.container} onPress={handlePress}>
       {/* Left Section */}
       <View style={styles.leftSection}>
         <View style={styles.imageWrapper}>
-          <Image source={{ uri: imageUrl }} style={styles.image} />
+          {!!imageUrl && (
+            <Image
+              source={{ uri: imageUrl }}
+              style={{ width: 48, height: 48, borderRadius: 24 }}
+            />
+          )}
           <View style={styles.ratingBadge}>
             <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
             <Ionicons name="star" size={12} color="#fff" />
           </View>
         </View>
         <View style={styles.textBlock}>
-          <View style={styles.statusRow}>
-            <View style={[styles.statusDot, isOnline && styles.onlineDot]} />
-            <Text style={styles.onlineText}>
-              {isOnline ? "Online" : "Offline"}
-            </Text>
-          </View>
           <Text style={styles.nameText}>{name}</Text>
           <Text style={styles.positionText}>{position}</Text>
         </View>
