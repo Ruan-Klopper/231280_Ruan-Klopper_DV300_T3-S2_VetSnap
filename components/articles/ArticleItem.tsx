@@ -40,6 +40,14 @@ const ArticleItem = ({
   const visibleCategories = categories.slice(0, maxVisible);
   const hasMore = categories.length > maxVisible;
 
+  const cropTitleByX = (title: string): string => {
+    const xCount = 53;
+    const cropLength = xCount > 0 ? xCount : title.length;
+    return title.length > cropLength
+      ? title.slice(0, cropLength) + "..."
+      : title;
+  };
+
   const Content = () => (
     <>
       <LinearGradient
@@ -70,7 +78,7 @@ const ArticleItem = ({
             <Text style={styles.sourceText}>{source}</Text>
           </View>
         )}
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>{cropTitleByX(title)}</Text>
       </View>
     </>
   );

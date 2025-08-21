@@ -17,6 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { GetCurrentUserData } from "../../services/auth/authService";
+import { TabContext, useTab } from "./TabContext";
 
 const { width } = Dimensions.get("window");
 
@@ -31,7 +33,6 @@ type AppHeaderProps = {
   onBackPress?: () => void;
   onSavePress?: (articleId?: string | null) => void;
   onNotificationsPress?: () => void;
-  onProfilePress?: () => void;
   containerStyle?: ViewStyle;
   titleStyle?: TextStyle;
   enableSheen?: boolean;
@@ -52,7 +53,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onBackPress,
   onSavePress,
   onNotificationsPress,
-  onProfilePress,
   containerStyle,
   titleStyle,
   enableSheen = false,
@@ -83,6 +83,17 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     ).start();
   }, [enableSheen, sheenAnim]);
 
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const res = await GetCurrentUserData();
+      if (res.success) {
+        setUser(res.data);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (!enableParticles) return;
     Animated.loop(
@@ -105,6 +116,22 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     outputRange: [0, -15],
   });
 
+  // SAFE: does not throw outside provider
+  const tabCtx = React.useContext(TabContext as any) as
+    | { setActiveTab?: (t: string) => void }
+    | undefined;
+
+  const goProfile = () => {
+    if (tabCtx?.setActiveTab) {
+      tabCtx.setActiveTab("profile");
+    } else {
+      // we're on a stack: fall back to normal navigation
+      // adjust the route name to your Profile screen id
+      // @ts-ignore
+      navigation.navigate("Profile");
+    }
+  };
+
   const renderLeft = () => {
     switch (variant) {
       case 1:
@@ -118,6 +145,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </Text>
           </View>
         );
+
       case 2:
         return (
           <View style={styles.leftSection}>
@@ -134,38 +162,44 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </Text>
           </View>
         );
+
+      // ── Variant 3: Paw + Title (no back on the left)
       case 3:
         return (
           <View style={styles.leftSection}>
-            <Pressable
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </Pressable>
+            {leftLogo ?? (
+              <Ionicons
+                name="paw"
+                size={24}
+                color="white"
+                style={{ marginRight: 8 }}
+              />
+            )}
             <Text style={[styles.headerTitle, titleStyle]} numberOfLines={1}>
               {title}
             </Text>
           </View>
         );
+
+      // ── Variant 4: Chat header (paw optional) + recipient info
       case 4:
         return (
           <View style={styles.leftSection}>
-            <Pressable
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </Pressable>
+            {leftLogo ?? (
+              <Ionicons
+                name="paw"
+                size={24}
+                color="white"
+                style={{ marginRight: 8 }}
+              />
+            )}
             <View style={styles.chatUserInfo}>
               {recipientAvatarUrl && (
                 <View style={styles.avatarWrapper}>
                   <View
                     style={[
                       styles.statusDot,
-                      {
-                        backgroundColor: isOnline ? "#00C851" : "#ccc",
-                      },
+                      { backgroundColor: isOnline ? "#00C851" : "#ccc" },
                     ]}
                   />
                   <View style={styles.avatarBorder}>
@@ -188,39 +222,50 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </View>
           </View>
         );
+
       default:
         return null;
     }
   };
 
-  const renderRight = () => (
-    <View style={styles.rightSection}>
-      {variant === 3 && (
-        <Pressable
-          style={styles.iconButton}
-          onPress={() => onSavePress?.(articleId)}
-        >
-          <Ionicons
-            name={isSaved ? "bookmark" : "bookmark-outline"}
-            size={24}
-            color="white"
-          />
+  const renderRight = () => {
+    // ── For Variant 3 and 4, show ONLY a circular back button
+    if (variant === 3 || variant === 4) {
+      return (
+        <View style={styles.rightSection}>
+          <Pressable
+            style={styles.profileButton}
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={22} color="black" />
+          </Pressable>
+        </View>
+      );
+    }
+
+    // ── Default for other variants (1 & 2): keep your existing actions
+    return (
+      <View style={styles.rightSection}>
+        {/* Example: notifications */}
+        <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
+          <Ionicons name="notifications-outline" size={24} color="white" />
         </Pressable>
-      )}
 
-      <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
-        <Ionicons name="notifications-outline" size={24} color="white" />
-      </Pressable>
-
-      <Pressable style={styles.profileButton} onPress={onProfilePress}>
-        {userAvatarUrl ? (
-          <Image source={{ uri: userAvatarUrl }} style={styles.profileAvatar} />
-        ) : (
-          <Ionicons name="person" size={22} color="black" />
-        )}
-      </Pressable>
-    </View>
-  );
+        {/* Example: profile (tabs or fallback) */}
+        <Pressable style={styles.profileButton} onPress={goProfile}>
+          {user?.photoURL ? (
+            <Image
+              source={{ uri: user?.photoURL }}
+              style={styles.profileAvatar}
+            />
+          ) : (
+            <Ionicons name="person" size={22} color="black" />
+          )}
+        </Pressable>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.wrapper, containerStyle]} pointerEvents="box-none">

@@ -254,12 +254,7 @@ const YourPulses = () => {
 
   return (
     <View style={globalStyles.root}>
-      <AppHeader
-        variant={2}
-        title="Pulses"
-        userAvatarUrl={user?.photoURL}
-        userName={user?.fullName}
-      />
+      <AppHeader variant={3} title="Pulses" />
 
       <AppContentGroup
         headerComponents={

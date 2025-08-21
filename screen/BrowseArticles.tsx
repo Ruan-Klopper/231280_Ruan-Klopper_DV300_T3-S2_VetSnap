@@ -1,14 +1,26 @@
-import { StyleSheet, Text, View, ScrollView, Pressable } from "react-native";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+// /screens/BrowseArticles.tsx
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  FlatList,
+  ScrollView,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { globalStyles } from "../global/styles";
 import AppHeader from "../components/global/AppHeader";
-import AppContentGroup from "../components/global/AppContentGroup";
 import SearchBar from "../components/global/SearchBar";
 import ArticleItem from "../components/articles/ArticleItem";
 import LoadingIndicator from "../components/global/LoadingIndicator";
-import ArticleFilterGroup from "../components/articles/ArticleFilterGroup";
+import { globalStyles } from "../global/styles";
 import { getAllArticles } from "../services/sanity/sanityService";
 
 // ─── Types ─────────────────────────────
@@ -21,182 +33,243 @@ type Article = {
   documentId?: number;
 };
 
-// ─── Constants ────────────────────────
-const filters = ["All", "Public", "Anipedia", "Veterinarians"];
-const filterSourceMap: Record<string, number | null> = {
-  All: null,
-  Public: 1,
-  Anipedia: 0,
-  Veterinarians: 2,
-};
-
-// ─── Header ───────────────────────────
-const HeaderComponents = () => {
-  const [query, setQuery] = useState("");
-  return (
-    <>
-      <Text style={styles.headerText}>Browse all Articles</Text>
-      <SearchBar
-        value={query}
-        onChangeText={setQuery}
-        onSearch={(q) => console.log("Searching for:", q)}
-      />
-    </>
-  );
-};
-
-// ─── Main Screen ──────────────────────
 const BrowseArticles = () => {
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<Article>>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [viewType, setViewType] = useState("All Articles");
-  const [activeFilter, setActiveFilter] = useState("All");
   const [articles, setArticles] = useState<Article[]>([]);
-  const [filteredArticles, setFilteredArticles] = useState<Article[]>([]);
-  const [showToTop, setShowToTop] = useState(false);
+
+  // Search states
+  const [inputValue, setInputValue] = useState(""); // immediate keystrokes
+  const [query, setQuery] = useState(""); // debounced applied query
+  const [isSearching, setIsSearching] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false); // loader in list area
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Category chips
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
 
   // Initial fetch
   useEffect(() => {
-    const fetchArticles = async () => {
+    (async () => {
       const result = await getAllArticles();
-      if (result.success && result.data) {
-        setArticles(result.data);
-        setFilteredArticles(result.data);
-      }
+      if (result.success && result.data) setArticles(result.data);
       setIsLoading(false);
-    };
-    fetchArticles();
+    })();
   }, []);
 
-  // Filtering logic with slight delay
-  useEffect(() => {
+  // Build category list from keywords
+  const categories = useMemo(() => {
+    const s = new Set<string>();
+    articles.forEach((a) => (a.keywords || []).forEach((k) => s.add(k.trim())));
+    return ["All", ...Array.from(s).filter(Boolean).sort().slice(0, 30)];
+  }, [articles]);
+
+  // Debounced search handler (keeps keyboard open)
+  const handleChangeQuery = useCallback((text: string) => {
+    setInputValue(text);
+    setIsSearching(!!text.trim());
     setIsFiltering(true);
-    const timeout = setTimeout(() => {
-      const filtered = articles.filter((article) =>
-        filterSourceMap[activeFilter] === null
-          ? true
-          : article.source === filterSourceMap[activeFilter]
-      );
-      setFilteredArticles(filtered);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setQuery(text);
       setIsFiltering(false);
     }, 250);
-
-    return () => clearTimeout(timeout);
-  }, [activeFilter, articles]);
-
-  const showRef = useRef(false);
-
-  const handleScroll = useCallback((e: any) => {
-    const y = e?.nativeEvent?.contentOffset?.y ?? 0;
-    const next = y > 120;
-    if (showRef.current !== next) {
-      showRef.current = next;
-      setShowToTop(next);
-    }
   }, []);
 
-  const scrollToTop = () => {
-    scrollRef.current?.scrollTo({ x: 0, y: 0, animated: true });
-  };
+  const handleCancel = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setInputValue("");
+    setQuery("");
+    setIsSearching(false);
+    setIsFiltering(false);
+  }, []);
+
+  const toggleCategory = useCallback((cat: string) => {
+    setSelectedCategory((prev) => (prev === cat ? "All" : cat));
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  // Filter using the DEBOUNCED query + category
+  const filteredArticles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return articles.filter((a) => {
+      const matchesQuery =
+        !q ||
+        a.title?.toLowerCase().includes(q) ||
+        (a.keywords || []).some((k) => k.toLowerCase().includes(q));
+
+      const matchesCategory =
+        selectedCategory === "All" ||
+        (a.keywords || []).map((k) => k.trim()).includes(selectedCategory);
+
+      return matchesQuery && matchesCategory;
+    });
+  }, [articles, query, selectedCategory]);
 
   const bottomOffset = 80 + insets.bottom;
 
+  const cropTitleByX = (title: string): string => {
+    const xCount = 9;
+    const cropLength = xCount > 0 ? xCount : title.length;
+    return title.length > cropLength
+      ? title.slice(0, cropLength) + "..."
+      : title;
+  };
+
   return (
-    <View style={globalStyles.root}>
+    <View style={styles.root}>
       <AppHeader variant={2} title="Browse" />
 
-      {/* Single scroll view controlling the page */}
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        removeClippedSubviews={true} // ✅ helps on Android for long lists
-        overScrollMode="never" // optional: avoid bounce jank on Android
-      >
-        <AppContentGroup headerComponents={<HeaderComponents />}>
-          <ArticleFilterGroup />
+      {/* Nicer, compact header (outside FlatList to preserve focus) */}
+      <View style={styles.topWrap}>
+        <Text style={styles.pageTitle}>Browse all Articles</Text>
 
-          <View
-            style={[
-              globalStyles.globalContentBlock,
-              globalStyles.globalContentBlockPadding,
-            ]}
-          >
-            {/* View Type Heading */}
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.subtitle}>Viewing</Text>
-                <Text style={styles.heading}>{viewType}</Text>
-              </View>
-            </View>
-
-            {/* Filter Pills */}
-            <View style={styles.pillsContainer}>
-              {filters.map((filter) => (
-                <Text
-                  key={filter}
-                  onPress={() => {
-                    setActiveFilter(filter);
-                    setViewType(`${filter} Articles`);
-                  }}
-                  style={[
-                    styles.pill,
-                    activeFilter === filter && styles.activePill,
-                  ]}
-                >
-                  {filter}
-                </Text>
-              ))}
-            </View>
-
-            {/* Content */}
-            {isLoading ? (
-              <LoadingIndicator progress={42} message="Loading articles..." />
-            ) : isFiltering ? (
-              <LoadingIndicator progress={20} message="Filtering articles..." />
-            ) : (
-              <View style={{ gap: 8, paddingBottom: 32 }}>
-                {filteredArticles.map((item) => (
-                  <ArticleItem
-                    key={item._id}
-                    id={item._id}
-                    documentId={item.documentId}
-                    title={item.title}
-                    categories={item.keywords || []}
-                    image={item.bannerImage || ""}
-                    source={
-                      item.source === 0
-                        ? "Anipedia"
-                        : item.source === 1
-                        ? "Public"
-                        : "Veterinarians"
-                    }
-                  />
-                ))}
-              </View>
-            )}
+        <View style={styles.searchRow}>
+          <View style={{ flex: 1 }}>
+            <SearchBar
+              value={inputValue}
+              onChangeText={handleChangeQuery}
+              onSearch={handleChangeQuery}
+              onCancel={handleCancel as any}
+              // @ts-ignore – if your SearchBar forwards these
+              blurOnSubmit={false}
+              autoCorrect={false}
+              returnKeyType="search"
+            />
           </View>
-        </AppContentGroup>
-      </ScrollView>
 
-      {/* Floating Scroll-To-Top button */}
-      <View style={styles.fabOverlay} pointerEvents="box-none">
-        {showToTop && (
-          <Pressable
-            onPress={scrollToTop}
-            style={[styles.fab, { bottom: bottomOffset }]}
-            android_ripple={{ color: "#e0e0e0", borderless: true }}
+          {/* Inline cancel button */}
+          {isSearching && (
+            <Pressable onPress={handleCancel} style={styles.cancelPill}>
+              <Ionicons name="close" size={16} color="#2F3E46" />
+              <Text style={styles.cancelText}>Cancel</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Category chips */}
+        {!!categories.length && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+            keyboardShouldPersistTaps="always"
           >
-            <Ionicons name="arrow-up" size={24} color="#2F3E46" />
-          </Pressable>
+            {categories.map((cat) => {
+              const selected = cat === selectedCategory;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => toggleCategory(cat)}
+                  style={[styles.chip, selected && styles.chipSelected]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      selected && styles.chipTextSelected,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         )}
+      </View>
+
+      {isLoading ? (
+        <View style={{ padding: 24 }}>
+          <LoadingIndicator progress={42} message="Loading articles..." />
+        </View>
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={isFiltering ? [] : filteredArticles} // show loader via ListEmptyComponent while filtering
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <ArticleItem
+              id={item._id}
+              documentId={item.documentId}
+              title={item.title}
+              categories={item.keywords || []}
+              image={item.bannerImage || ""}
+              source={
+                item.source === 0
+                  ? "Anipedia"
+                  : item.source === 1
+                  ? "Public"
+                  : "Veterinarians"
+              }
+            />
+          )}
+          // Clean white card that holds the list
+          contentContainerStyle={[
+            globalStyles.globalContentBlock,
+            globalStyles.globalContentBlockPadding,
+            styles.blockContainer,
+          ]}
+          // Small header inside the card
+          ListHeaderComponent={
+            <View style={styles.headerRow}>
+              <View>
+                <Text style={styles.subtitle}>
+                  {isSearching || selectedCategory !== "All"
+                    ? "Filtered view"
+                    : "Viewing"}
+                </Text>
+                <Text style={styles.heading}>
+                  {isSearching ? `"${inputValue.trim()}"` : "All Articles"}
+                  {selectedCategory !== "All"
+                    ? ` · ${cropTitleByX(selectedCategory)}`
+                    : ""}
+                </Text>
+              </View>
+              {(isSearching || selectedCategory !== "All") && (
+                <Pressable
+                  onPress={() => {
+                    handleCancel();
+                    setSelectedCategory("All");
+                  }}
+                >
+                  <Text style={styles.clearFilters}>Clear</Text>
+                </Pressable>
+              )}
+            </View>
+          }
+          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ListEmptyComponent={
+            isFiltering ? (
+              <LoadingIndicator progress={66} message="Searching articles..." />
+            ) : (
+              <Text style={styles.emptyText}>
+                No articles match your filters.
+              </Text>
+            )
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={false} // keeps focus reliable on Android
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
+          overScrollMode="never"
+        />
+      )}
+
+      {/* Always-visible Scroll-To-Top button (centered) */}
+      <View style={styles.fabOverlay} pointerEvents="box-none">
+        <Pressable
+          onPress={scrollToTop}
+          style={[styles.fab, { bottom: bottomOffset }]}
+          android_ripple={{ color: "#e0e0e0", borderless: true }}
+        >
+          <Ionicons name="arrow-up" size={24} color="#2F3E46" />
+        </Pressable>
       </View>
     </View>
   );
@@ -206,13 +279,78 @@ export default BrowseArticles;
 
 // ─── Styles ────────────────────────────
 const styles = StyleSheet.create({
-  headerText: {
-    color: "white",
-    fontSize: 32,
-    fontWeight: "800",
-    marginBottom: 20,
+  root: {
+    flex: 1,
+    backgroundColor: "#F3F4EF",
+    paddingTop: 110,
   },
-  header: {
+
+  // Top section
+  topWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 10,
+    gap: 12,
+  },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#2F3E46",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  cancelPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
+  cancelText: {
+    fontWeight: "700",
+    color: "#2F3E46",
+  },
+
+  // Chips
+  chipsRow: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
+  chipSelected: {
+    backgroundColor: "#518649",
+    borderColor: "#518649",
+  },
+  chipText: {
+    color: "#2F3E46",
+    fontWeight: "600",
+  },
+  chipTextSelected: {
+    color: "#FFFFFF",
+  },
+
+  // White content block (the list lives inside this card)
+  blockContainer: {
+    marginHorizontal: 20,
+    paddingBottom: 140,
+  },
+
+  // Block header (inside white card)
+  headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -221,42 +359,37 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     fontWeight: "300",
+    color: "#2F3E46",
   },
   heading: {
     fontSize: 24,
     fontWeight: "800",
+    color: "#2F3E46",
   },
-  pillsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    marginBottom: 16,
-  },
-  pill: {
-    paddingHorizontal: 11,
-    paddingVertical: 4,
-    backgroundColor: "#333",
-    color: "#fff",
-    borderRadius: 20,
-    fontSize: 14,
-  },
-  activePill: {
-    backgroundColor: "#39B54A",
-    color: "#fff",
+  clearFilters: {
+    color: "#518649",
+    fontWeight: "700",
   },
 
-  // Floating Action Button (scroll to top)
+  // Empty state
+  emptyText: {
+    textAlign: "center",
+    paddingVertical: 32,
+    color: "#666",
+    fontSize: 16,
+  },
+
+  // FAB
   fabOverlay: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    // no background; sits above content but doesn't block touches except on the button itself
   },
   fab: {
     position: "absolute",
-    left: "50%", // center horizontally
-    marginLeft: -26, // half of width to perfectly center (width = 52)
+    left: "50%",
+    marginLeft: -26,
     width: 52,
     height: 52,
     borderRadius: 26,

@@ -287,10 +287,8 @@ const CreatePulse = () => {
   return (
     <View style={globalStyles.root}>
       <AppHeader
-        variant={1}
+        variant={3}
         title={isEditMode ? "Editing Pulse" : "Create Pulse"}
-        userAvatarUrl={user?.photoURL}
-        userName={user?.fullName}
       />
 
       <AppContentGroup

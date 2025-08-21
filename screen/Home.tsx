@@ -47,12 +47,7 @@ const Home = () => {
   return (
     <View style={globalStyles.root}>
       {/* Header */}
-      <AppHeader
-        title="VetSnap"
-        userAvatarUrl={user?.photoURL}
-        userName={user?.fullName}
-        onProfilePress={() => navigation.navigate("Chat")}
-      />
+      <AppHeader title="VetSnap" />
 
       {/* Content Area */}
       <AppContentGroup

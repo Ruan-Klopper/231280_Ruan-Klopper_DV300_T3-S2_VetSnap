@@ -35,10 +35,10 @@ const AppContentGroup: React.FC<AppContentGroupProps> = ({
               ? { uri: headerBackground.value }
               : headerBackground.value
           }
-          style={styles.topGroup}
+          style={appContentStyles.topGroup}
         >
           {/* Dark overlay */}
-          <View style={styles.imageOverlay} />
+          <View style={appContentStyles.imageOverlay} />
 
           {children}
         </ImageBackground>
@@ -48,7 +48,7 @@ const AppContentGroup: React.FC<AppContentGroupProps> = ({
     return (
       <View
         style={[
-          styles.topGroup,
+          appContentStyles.topGroup,
           { backgroundColor: headerBackground.value as string },
         ]}
       >
@@ -59,19 +59,21 @@ const AppContentGroup: React.FC<AppContentGroupProps> = ({
 
   return (
     <ScrollView
-      style={styles.container}
+      style={appContentStyles.container}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
     >
       <TopGroupWrapper>
-        <View style={styles.topGroupContainer}>{headerComponents}</View>
+        <View style={appContentStyles.topGroupContainer}>
+          {headerComponents}
+        </View>
         <LinearGradient
           colors={["transparent", "#F3F4EF"]}
-          style={styles.linearGradientBottom}
+          style={appContentStyles.linearGradientBottom}
         />
       </TopGroupWrapper>
 
-      <View style={[styles.contentContainer, { marginTop: -240 }]}>
+      <View style={[appContentStyles.contentContainer, { marginTop: -240 }]}>
         {children}
       </View>
     </ScrollView>
@@ -80,7 +82,7 @@ const AppContentGroup: React.FC<AppContentGroupProps> = ({
 
 export default AppContentGroup;
 
-const styles = StyleSheet.create({
+export const appContentStyles = StyleSheet.create({
   container: {
     backgroundColor: "#F3F4EF",
     minHeight: "100%",

@@ -74,13 +74,7 @@ const UserProfile = ({ navigation }: any) => {
   return (
     <View style={globalStyles.root}>
       {/* ✅ Header */}
-      <AppHeader
-        variant={2}
-        title="Profile"
-        userAvatarUrl={user?.photoURL}
-        userName={user?.fullName}
-        onProfilePress={() => {}}
-      />
+      <AppHeader variant={2} title="Profile" />
 
       <ScrollView>
         <AppContentGroup
