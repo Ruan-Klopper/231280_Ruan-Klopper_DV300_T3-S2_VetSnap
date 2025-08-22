@@ -379,7 +379,6 @@ const AllChats: React.FC = () => {
                       name={v.fullName}
                       position={v.vetProfile?.clinicName || "Veterinarian"}
                       imageUrl={v.photoURL ?? ""} // ensure string
-                      rating={v.vetProfile?.rating ?? 5}
                       onPress={() => handleStartChat(v.userId)}
                     />
                   );
@@ -424,7 +423,6 @@ const AllChats: React.FC = () => {
                     time={time}
                     message={lastText}
                     avatarUrl={avatarUrl}
-                    rating={5}
                     isUnread={true}
                     onPress={() => handleOpenConversation(c)}
                   />
@@ -468,7 +466,6 @@ const AllChats: React.FC = () => {
                     time={time}
                     message={lastText}
                     avatarUrl={avatarUrl}
-                    rating={5}
                     isUnread={false}
                     onPress={() => handleOpenConversation(c)}
                   />

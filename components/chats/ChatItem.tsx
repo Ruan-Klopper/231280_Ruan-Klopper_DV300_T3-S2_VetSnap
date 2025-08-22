@@ -19,7 +19,6 @@ export type ChatItemProps = {
   time: string;
   message: string;
   avatarUrl: string;
-  rating: number;
   isUnread: boolean;
   // optional navigation params (used if onPress not provided)
   navigationParams?: {
@@ -34,7 +33,6 @@ const ChatItem: React.FC<ChatItemProps> = ({
   time,
   message,
   avatarUrl,
-  rating,
   isUnread,
   onPress,
   navigationParams,
@@ -48,6 +46,14 @@ const ChatItem: React.FC<ChatItemProps> = ({
 
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const cropTitleByX = (title: string, count: number): string => {
+    const xCount = count;
+    const cropLength = xCount > 0 ? xCount : title.length;
+    return title.length > cropLength
+      ? title.slice(0, cropLength) + "..."
+      : title;
+  };
 
   return (
     <Pressable onPress={handlePress}>
@@ -64,18 +70,13 @@ const ChatItem: React.FC<ChatItemProps> = ({
           />
         )}
 
-        <View style={styles.ratingBadge}>
-          <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-          <Text style={styles.star}>★</Text>
-        </View>
-
         <View style={styles.infoContainer}>
           <Text style={styles.name}>{name}</Text>
           <View style={styles.row}>
             <Text style={styles.time}>{time}</Text>
             {isUnread && <View style={styles.dot} />}
             <Text style={styles.message} numberOfLines={1}>
-              {message}
+              {cropTitleByX(message, 30)}
             </Text>
           </View>
         </View>

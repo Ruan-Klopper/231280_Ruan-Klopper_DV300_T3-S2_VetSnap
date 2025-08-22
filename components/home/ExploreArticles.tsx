@@ -1,106 +1,142 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ImageBackground,
   StyleSheet,
   Text,
   View,
   Pressable,
   FlatList,
+  RefreshControl,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { globalStyles } from "../../global/styles";
 import { useNavigation } from "@react-navigation/native";
 import { useTab } from "../global/TabContext";
+import ArticleItem from "../articles/ArticleItem";
 
-// Example data
-const articles = [
-  {
-    id: "1",
-    title: "Chapter 15: Amoebic infections",
-    categories: ["Muscidae", "Stomoxyinae", "Fanniinae"],
-    image:
-      "https://media.wired.com/photos/593261cab8eb31692072f129/3:2/w_2560%2Cc_limit/85120553.jpg",
-  },
-  {
-    id: "2",
-    title: "Chapter 16: Viral infections",
-    categories: ["Retroviridae", "Flaviviridae"],
-    image:
-      "https://www.worldanimalprotection.org/cdn-cgi/image/width=1920,format=auto/globalassets/images/elephants/1033551-elephant.jpg",
-  },
-  {
-    id: "3",
-    title: "Chapter 16: Viral infections",
-    categories: ["Retroviridae", "Flaviviridae"],
-    image:
-      "https://www.aaha.org/wp-content/uploads/2024/03/b5e516f1655346558958c939e85de37a.jpg",
-  },
-];
+// Services
+import {
+  getRandomArticles,
+  getAllArticles,
+} from "../../services/sanity/sanityService";
 
-const ArticlesItem = ({ article }: { article: (typeof articles)[0] }) => {
-  const navigation = useNavigation();
-  return (
-    <Pressable
-      style={styles.card}
-      onPress={() => navigation.navigate("ArticleSingleView" as never)}
-    >
-      <ImageBackground
-        source={{ uri: article.image }}
-        style={styles.image}
-        imageStyle={{ borderRadius: 20 }}
-      >
-        <LinearGradient
-          colors={["rgba(81,134,73,0.6)", "rgba(81,134,73,0.2)"]}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.gradient}
-        />
-
-        {/* Tags */}
-        <View style={styles.tagsContainer}>
-          {article.categories.map((cat) => (
-            <View key={cat} style={styles.tag}>
-              <Text style={styles.tagText}>{cat}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Title */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{article.title}</Text>
-        </View>
-      </ImageBackground>
-    </Pressable>
-  );
+// ─── Types (match your service) ─────────────────────────
+type ArticleThumb = {
+  _id: string;
+  title: string;
+  keywords?: string[];
+  source: number; // 0 anipedia, 1 public, 2 vets
+  bannerImage?: string;
+  documentId?: number;
 };
 
-const ExploreArticles = () => {
-  const navigation = useNavigation();
+const ExploreArticles: React.FC = () => {
   const { setActiveTab } = useTab();
+  const navigation = useNavigation();
+
+  const [items, setItems] = useState<ArticleThumb[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const pick10 = (arr: ArticleThumb[]) => arr.slice(0, 10);
+
+  const loadRandom = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Prefer the dedicated random endpoint if present:
+      const resp = await getRandomArticles?.(10);
+      if (resp?.success && resp.data) {
+        setItems(resp.data);
+      } else {
+        // Fallback: get all, shuffle, take 10
+        const all = await getAllArticles();
+        if (all.success && all.data) {
+          const shuffled = [...all.data].sort(() => Math.random() - 0.5);
+          setItems(pick10(shuffled));
+        } else {
+          setItems([]);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRandom();
+  }, [loadRandom]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadRandom();
+    setRefreshing(false);
+  }, [loadRandom]);
+
   return (
-    <View style={[globalStyles.globalContentBlock]}>
+    <View style={[globalStyles.globalContentBlock, styles.block]}>
       <View style={styles.header}>
         <View>
           <Text style={styles.subtitle}>Explore</Text>
           <Text style={styles.heading}>Articles</Text>
         </View>
-        <Pressable
-          style={styles.arrowButton}
-          onPress={() => setActiveTab("book")}
-        >
-          <Ionicons name="arrow-forward" size={24} color="#000" />
-        </Pressable>
+
+        <View style={styles.headerActions}>
+          {/* Re-roll random selection */}
+          <Pressable onPress={onRefresh} style={styles.refreshBtn}>
+            <Ionicons name="shuffle" size={18} color="#1D301E" />
+            <Text style={styles.refreshText}>Shuffle</Text>
+          </Pressable>
+
+          {/* Go to full list */}
+          <Pressable
+            style={styles.arrowButton}
+            onPress={() => setActiveTab("book")}
+          >
+            <Ionicons name="arrow-forward" size={22} color="#000" />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
         horizontal
-        data={articles}
-        renderItem={({ item }) => <ArticlesItem article={item} />}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ gap: 16 }}
+        data={items}
+        keyExtractor={(it) => it._id}
+        renderItem={({ item }) => (
+          <View style={{ width: 300 }}>
+            <ArticleItem
+              id={item._id}
+              documentId={item.documentId}
+              title={item.title}
+              categories={item.keywords || []}
+              image={item.bannerImage}
+              source={
+                item.source === 0
+                  ? "Anipedia"
+                  : item.source === 1
+                  ? "Public"
+                  : "Veterinarian"
+              }
+            />
+          </View>
+        )}
+        contentContainerStyle={{
+          gap: 16,
+          paddingHorizontal: 20,
+          paddingBottom: 20,
+        }}
         showsHorizontalScrollIndicator={false}
-        style={{ paddingHorizontal: 20, paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing && !loading}
+            onRefresh={onRefresh}
+          />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <Text style={styles.muted}>Loading…</Text>
+          ) : (
+            <Text style={styles.muted}>No articles found.</Text>
+          )
+        }
       />
     </View>
   );
@@ -109,20 +145,18 @@ const ExploreArticles = () => {
 export default ExploreArticles;
 
 const styles = StyleSheet.create({
+  block: { paddingBottom: 0 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
-  subtitle: {
-    fontSize: 15,
-    fontWeight: "300",
-  },
-  heading: {
-    fontSize: 24,
-    fontWeight: "800",
-  },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  subtitle: { fontSize: 15, fontWeight: "300" },
+  heading: { fontSize: 24, fontWeight: "800" },
   arrowButton: {
     width: 42,
     height: 42,
@@ -131,44 +165,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  card: {
-    height: 225,
-    width: 199,
-    borderRadius: 20,
-    overflow: "hidden",
-  },
-  image: {
-    height: "100%",
-    width: "100%",
-    justifyContent: "space-between",
-  },
-  gradient: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
-  },
-  tagsContainer: {
+  refreshBtn: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    padding: 12,
+    alignItems: "center",
     gap: 6,
+    backgroundColor: "#EAF4E8",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
   },
-  tag: {
-    backgroundColor: "white",
-    borderRadius: 99,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontSize: 12,
-    color: "#333",
-    fontWeight: "500",
-  },
-  titleContainer: {
-    padding: 15,
-  },
-  title: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
+  refreshText: { fontWeight: "700", color: "#1D301E" },
+  muted: { color: "#6B7280", paddingHorizontal: 20 },
 });

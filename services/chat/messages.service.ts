@@ -1,219 +1,112 @@
-// services/chat/messages.service.ts
+// /services/chat/messages.service.ts
 import {
   addDoc,
   collection,
-  deleteDoc,
-  getDoc,
-  getDocs,
-  limit,
+  doc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  startAfter,
-  type DocumentData,
-  type QueryDocumentSnapshot,
+  updateDoc,
 } from "firebase/firestore";
-import { db } from "../../config/firebase";
-import { ok, fail, CONV_COL, MSGS_SUB, currentUid, uriToBlob } from "./common";
-import type { ApiResponse } from "../../interfaces/apiResponse";
-import type { Message } from "../../interfaces/chat";
-import { uploadChatImage } from "./storage.service";
-import { postSendUpdateConversation } from "./conversations.service";
+import { db, storage } from "../../config/firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
-export const listenToMessages = (
-  conversationId: string,
-  onChange: (messages: Message[]) => void,
-  pageSize = 25
-): ApiResponse<() => void> => {
-  try {
-    const q = query(
-      collection(db, CONV_COL, conversationId, MSGS_SUB),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      onChange(
-        snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Message[]
-      );
-    });
-    return ok<() => void>(unsub);
-  } catch (e: any) {
-    return fail<() => void>(e?.message ?? "Failed to listen to messages", 500);
-  }
+// ---- Types ----
+export type MessageDoc = {
+  id?: string;
+  senderId: string;
+  text?: string | null;
+  imageUrl?: string | null;
+  status?: "sent" | "delivered" | "read" | "uploading";
+  createdAt?: any;
 };
 
-export const sendTextMessage = async (
+// Convenience
+const CONV = "conversations";
+const MSGS = "messages";
+
+// Optional helper if you use a standard ApiResponse shape
+const ok = <T>(data: T) => ({ success: true as const, data });
+const fail = (message: string) => ({ success: false as const, message });
+
+// ---- LISTEN ----
+export function listenToMessages(
   conversationId: string,
-  text: string
-): Promise<ApiResponse<Message>> => {
-  try {
-    const senderId = currentUid();
-    const trimmed = (text || "").trim();
-    if (!trimmed) return fail<Message>("Message is empty", 400);
-
-    const msgRef = await addDoc(
-      collection(db, CONV_COL, conversationId, MSGS_SUB),
-      {
-        senderId,
-        text: trimmed,
-        imageUrl: null,
-        createdAt: serverTimestamp(),
-        readBy: [senderId],
-        status: "sent",
-      }
-    );
-
-    await postSendUpdateConversation(conversationId, {
-      text: trimmed,
-      imageUrl: null,
-      senderId,
-    });
-
-    const snap = await getDoc(msgRef);
-    return ok<Message>(
-      { id: snap.id, ...(snap.data() as any) } as Message,
-      "Sent",
-      201
-    );
-  } catch (e: any) {
-    return fail<Message>(e?.message ?? "Failed to send message", 500);
-  }
-};
-
-export const sendImageMessageFromUri = async (
-  conversationId: string,
-  localUri: string
-): Promise<ApiResponse<Message>> => {
-  try {
-    const senderId = currentUid();
-
-    const preMsgRef = await addDoc(
-      collection(db, CONV_COL, conversationId, MSGS_SUB),
-      {
-        senderId,
-        text: null,
-        imageUrl: null,
-        createdAt: serverTimestamp(),
-        readBy: [senderId],
-        status: "sent",
-      }
-    );
-
-    const blob = await uriToBlob(localUri);
-    const upload = await uploadChatImage(conversationId, preMsgRef.id, blob);
-    if (!upload.success || !upload.data) {
-      await deleteDoc(preMsgRef); // ← cleanup placeholder
-      return fail<Message>(
-        upload.message || "Image upload failed",
-        upload.statusCode || 500
-      );
-    }
-
-    await (
-      await import("firebase/firestore")
-    ).updateDoc(preMsgRef, { imageUrl: upload.data });
-
-    await postSendUpdateConversation(conversationId, {
-      text: null,
-      imageUrl: upload.data,
-      senderId,
-    });
-
-    const snap = await getDoc(preMsgRef);
-    return ok<Message>(
-      { id: snap.id, ...(snap.data() as any) } as Message,
-      "Sent",
-      201
-    );
-  } catch (e: any) {
-    return fail<Message>(e?.message ?? "Failed to send image message", 500);
-  }
-};
-
-export const loadMoreMessages = async (
-  conversationId: string,
-  lastDoc: QueryDocumentSnapshot<DocumentData> | null,
-  pageSize = 25
-): Promise<
-  ApiResponse<{
-    messages: Message[];
-    lastDoc: QueryDocumentSnapshot<DocumentData> | null;
-  }>
-> => {
-  try {
-    let qBase = query(
-      collection(db, CONV_COL, conversationId, MSGS_SUB),
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
-    if (lastDoc)
-      qBase = query(
-        collection(db, CONV_COL, conversationId, MSGS_SUB),
-        orderBy("createdAt", "desc"),
-        startAfter(lastDoc),
-        limit(pageSize)
-      );
-
-    const snap = await getDocs(qBase);
-    const messages = snap.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as any),
-    })) as Message[];
-    const nextLast = snap.docs.length ? snap.docs[snap.docs.length - 1] : null;
-
-    return ok<{ messages: Message[]; lastDoc: typeof nextLast }>({
-      messages,
-      lastDoc: nextLast,
-    });
-  } catch (e: any) {
-    return fail<{ messages: Message[]; lastDoc: any }>(
-      e?.message ?? "Failed to load more messages",
-      500
-    );
-  }
-};
-
-// Mark all incoming messages as DELIVERED when I subscribe/open the chat
-export async function ackMessagesDelivered(
-  conversationId: string,
-  myUid: string
-): Promise<void> {
-  const { getDocs, query, collection, where, limit } = await import(
-    "firebase/firestore"
-  );
+  cb: (docs: MessageDoc[]) => void
+) {
   const q = query(
-    collection(db, CONV_COL, conversationId, MSGS_SUB),
-    where("senderId", "!=", myUid),
-    where("status", "==", "sent"),
-    limit(100)
+    collection(db, CONV, conversationId, MSGS),
+    orderBy("createdAt", "asc")
   );
-  const snap = await getDocs(q);
-  const { writeBatch } = await import("firebase/firestore");
-  const batch = writeBatch(db);
-  snap.forEach((d) => batch.update(d.ref, { status: "delivered" }));
-  await batch.commit();
+
+  const unsub = onSnapshot(q, (snap) => {
+    const rows: MessageDoc[] = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...(d.data() as any) }));
+    cb(rows);
+  });
+
+  return ok(unsub); // { success: true, data: () => void }
 }
 
-// Mark messages as READ and add me to readBy
-export async function markMessagesRead(
+// ---- SEND TEXT ----
+export async function sendTextMessage(
   conversationId: string,
-  myUid: string
-): Promise<void> {
-  const { getDocs, query, collection, where, limit } = await import(
-    "firebase/firestore"
-  );
-  const q = query(
-    collection(db, CONV_COL, conversationId, MSGS_SUB),
-    where("senderId", "!=", myUid),
-    where("status", "in", ["sent", "delivered"]),
-    limit(200)
-  );
-  const snap = await getDocs(q);
-  const { writeBatch, arrayUnion } = await import("firebase/firestore");
-  const batch = writeBatch(db);
-  snap.forEach((d) =>
-    batch.update(d.ref, { status: "read", readBy: arrayUnion(myUid) })
-  );
-  await batch.commit();
+  senderId: string,
+  text: string
+) {
+  try {
+    await addDoc(collection(db, CONV, conversationId, MSGS), {
+      senderId,
+      text: text ?? null,
+      imageUrl: null,
+      status: "sent",
+      createdAt: serverTimestamp(),
+    });
+    return ok(true);
+  } catch (e: any) {
+    return fail(e?.message ?? "Failed to send text");
+  }
+}
+
+// ---- SEND IMAGE (patient) ----
+export async function sendImageMessage(
+  conversationId: string,
+  senderId: string,
+  localImageUri: string,
+  contentType = "image/jpeg"
+) {
+  try {
+    // 1) Pre-create a message with status: uploading
+    const msgRef = await addDoc(collection(db, CONV, conversationId, MSGS), {
+      senderId,
+      text: null,
+      imageUrl: null,
+      status: "uploading",
+      createdAt: serverTimestamp(),
+    });
+
+    // 2) Convert local URI to Blob (Expo/RN-friendly)
+    const blob = await (await fetch(localImageUri)).blob();
+
+    // 3) Upload to Storage (resumable)
+    const sref = ref(storage, `chat_images/${conversationId}/${msgRef.id}`);
+    const task = uploadBytesResumable(sref, blob, { contentType });
+
+    await new Promise<void>((resolve, reject) => {
+      task.on("state_changed", undefined, reject, () => resolve());
+    });
+
+    const url = await getDownloadURL(task.snapshot.ref);
+
+    // 4) Patch message with final imageUrl + status: sent
+    await updateDoc(doc(db, CONV, conversationId, MSGS, msgRef.id), {
+      imageUrl: url,
+      status: "sent",
+    });
+
+    return ok(true);
+  } catch (e: any) {
+    return fail(e?.message ?? "Failed to send image");
+  }
 }

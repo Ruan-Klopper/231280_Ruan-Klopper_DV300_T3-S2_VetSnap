@@ -94,8 +94,8 @@ const UserProfile = ({ navigation }: any) => {
           }
         >
           <View style={{ gap: 12 }}>
-            {/* 🔹 Saved Articles */}
-            <View
+            {/* 🔹 Saved Articles: To be implemented in the future */}
+            {/* <View
               style={[
                 globalStyles.globalContentBlock,
                 globalStyles.globalContentBlockPadding,
@@ -103,7 +103,7 @@ const UserProfile = ({ navigation }: any) => {
             >
               <Text style={styles.cardTitle}>Saved Articles</Text>
               <Text style={styles.cardHint}>Coming soon...</Text>
-            </View>
+            </View> */}
 
             {/* 🔹 Personal Info */}
             <View

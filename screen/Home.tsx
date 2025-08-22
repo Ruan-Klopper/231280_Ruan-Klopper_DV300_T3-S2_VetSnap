@@ -14,7 +14,7 @@ import PromotionalBlock from "../components/home/PromotionalBlock";
 
 // Media and content
 import promoImage1 from "../assets/images/vetsnap1.png";
-import promoImage2 from "../assets/images/vetsnap2.png";
+import promoImage2 from "../assets/images/vetsnap+2.png";
 import { GetCurrentUserData } from "../services/auth/authService";
 
 const HeaderComponents = () => {
@@ -56,14 +56,10 @@ const Home = () => {
       >
         <QuickActions />
         <ExploreArticles />
-        <PromotionalBlock
-          title="Talk to Veterinarian"
-          image="../assets/images/vetsnap2.png"
-        />
-
+        <PromotionalBlock title="Talk to Veterinarian" image={promoImage1} />
         <PromotionalBlock
           title="Get Full access to all resources"
-          image="../assets/images/vetsnap2.png"
+          image={promoImage2}
         />
       </AppContentGroup>
     </View>

@@ -12,7 +12,6 @@ export type NewChatItemProps = {
   name: string;
   position: string;
   imageUrl: string;
-  rating: number;
   // If provided, component can navigate after conversation creation by parent
   navigationParams?: {
     conversationId?: string;
@@ -25,7 +24,6 @@ const NewChatItem: React.FC<NewChatItemProps> = ({
   name,
   position,
   imageUrl,
-  rating,
   onPress,
   navigationParams,
 }) => {
@@ -50,10 +48,6 @@ const NewChatItem: React.FC<NewChatItemProps> = ({
               style={{ width: 48, height: 48, borderRadius: 24 }}
             />
           )}
-          <View style={styles.ratingBadge}>
-            <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-            <Ionicons name="star" size={12} color="#fff" />
-          </View>
         </View>
         <View style={styles.textBlock}>
           <Text style={styles.nameText}>{name}</Text>

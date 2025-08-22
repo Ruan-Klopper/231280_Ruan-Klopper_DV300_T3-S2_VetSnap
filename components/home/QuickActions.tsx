@@ -18,10 +18,7 @@ const QuickActions = () => {
     >
       <Text style={styles.title}>Quick actions</Text>
       <View style={styles.grid}>
-        <Pressable
-          style={styles.item}
-          onPress={() => navigation.navigate("Chat" as never)}
-        >
+        <Pressable style={styles.item} onPress={() => setActiveTab("chat")}>
           <Ionicons name="chatbubbles" size={24} color="white" />
           <Text style={styles.text}>Talk to a Veterinarian</Text>
         </Pressable>
@@ -31,9 +28,9 @@ const QuickActions = () => {
           <Text style={styles.text}>Explore Resources</Text>
         </Pressable>
 
-        <Pressable style={styles.item} onPress={() => setActiveTab("profile")}>
-          <Ionicons name="bookmark" size={24} color="white" />
-          <Text style={styles.text}>See your saved Articles</Text>
+        <Pressable style={styles.item} onPress={() => setActiveTab("pulse")}>
+          <Ionicons name="pulse" size={24} color="white" />
+          <Text style={styles.text}>View latest Pulses</Text>
         </Pressable>
 
         <Pressable style={styles.item} onPress={() => setActiveTab("profile")}>

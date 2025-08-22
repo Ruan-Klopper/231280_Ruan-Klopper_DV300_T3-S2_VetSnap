@@ -74,3 +74,35 @@ export async function getArticleById(id: string): Promise<ApiResponse<any>> {
     };
   }
 }
+
+export async function getRandomArticles(limit = 10) {
+  const query = `
+    *[_type == "article" && defined(title)] 
+    | order(random()) [0...$limit]{
+      _id,
+      title,
+      "keywords": coalesce(keywords, []),
+      source,
+      documentId,
+      // Prefer your existing image resolver if you have one;
+      // this selects an URL from your coverImage structure:
+      "bannerImage": select(
+        coverImage.imageType == "upload" => coverImage.srcUpload.asset->url,
+        coverImage.imageType == "string" => "http://www.comrobi.com/vetsnap/data/item_"+string(documentId)+"/"+coverImage.srcUrl,
+        null
+      )
+    }
+  `;
+
+  try {
+    const data = await sanityClient.fetch(query, { limit });
+    return { success: true, statusCode: 200, message: "OK", data };
+  } catch (error: any) {
+    return {
+      success: false,
+      statusCode: 500,
+      message: "Failed",
+      error: String(error),
+    };
+  }
+}

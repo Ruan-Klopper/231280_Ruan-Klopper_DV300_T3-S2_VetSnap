@@ -29,7 +29,6 @@ import {
 type HeaderComponentsProps = {
   totalCount: number;
   onCreatePulse: () => void;
-  onViewAll: () => void;
 };
 
 const HeaderComponents: React.FC<HeaderComponentsProps> = ({
@@ -55,17 +54,6 @@ const HeaderComponents: React.FC<HeaderComponentsProps> = ({
       >
         <Ionicons name="add" size={18} color="#fff" />
         <Text style={styles.hBtnPrimaryLabel}>Create Pulse</Text>
-      </Pressable>
-
-      <Pressable
-        onPress={onViewAll}
-        style={({ pressed }) => [
-          styles.hBtnSecondary,
-          pressed && { opacity: 0.9 },
-        ]}
-      >
-        <Ionicons name="albums" size={16} color="#518649" />
-        <Text style={styles.hBtnSecondaryLabel}>View All</Text>
       </Pressable>
     </View>
   </View>
@@ -263,7 +251,6 @@ const YourPulses = () => {
             // @ts-ignore
             onCreatePulse={() => navigation.navigate("CreatePulse")}
             // @ts-ignore
-            onViewAll={() => navigation.navigate("AllPulses")}
           />
         }
       >

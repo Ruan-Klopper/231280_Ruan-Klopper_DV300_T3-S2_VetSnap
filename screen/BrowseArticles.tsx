@@ -114,8 +114,8 @@ const BrowseArticles = () => {
 
   const bottomOffset = 80 + insets.bottom;
 
-  const cropTitleByX = (title: string): string => {
-    const xCount = 9;
+  const cropTitleByX = (title: string, count: number): string => {
+    const xCount = count;
     const cropLength = xCount > 0 ? xCount : title.length;
     return title.length > cropLength
       ? title.slice(0, cropLength) + "..."
@@ -225,9 +225,11 @@ const BrowseArticles = () => {
                     : "Viewing"}
                 </Text>
                 <Text style={styles.heading}>
-                  {isSearching ? `"${inputValue.trim()}"` : "All Articles"}
+                  {isSearching
+                    ? `"${cropTitleByX(inputValue.trim(), 8)}"`
+                    : "All Articles"}
                   {selectedCategory !== "All"
-                    ? ` · ${cropTitleByX(selectedCategory)}`
+                    ? ` · ${cropTitleByX(selectedCategory, 8)}`
                     : ""}
                 </Text>
               </View>

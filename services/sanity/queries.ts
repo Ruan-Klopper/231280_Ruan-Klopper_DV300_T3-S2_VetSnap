@@ -1,5 +1,7 @@
 // services/sanity/queries.ts
 
+import { sanityClient } from "./sanityClient";
+
 export const GET_ALL_ARTICLES = `
   *[_type == "article"] {
     _id,

@@ -32,7 +32,6 @@ import {
   type RouteProp,
 } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
 import AppHeader from "../components/global/AppHeader";
 
 // Auth / User
@@ -42,12 +41,11 @@ import type { AppUser } from "../interfaces/user";
 
 // Chat services
 import { markConversationRead } from "../services/chat/conversations.service";
-import * as Msg from "../services/chat/messages.service"; // keep flexible
-import { uploadChatImage } from "../services/chat/storage.service";
+import * as Msg from "../services/chat/messages.service"; // uses: listenToMessages, sendTextMessage, sendImageMessage
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const MAX_BUBBLE_WIDTH = SCREEN_WIDTH * 0.75;
-const MAX_IMAGE_WIDTH = MAX_BUBBLE_WIDTH - 32;
+const MAX_IMAGE_WIDTH = MAX_BUBBLE_WIDTH - 52;
 const FALLBACK_IMG_H = Math.round(MAX_IMAGE_WIDTH * 0.75);
 
 type ChatRouteParams = {
@@ -60,9 +58,10 @@ type ChatRoute = RouteProp<{ Chat: ChatRouteParams }, "Chat">;
 
 type MessageDoc = {
   id: string;
-  text?: string;
-  imageUrl?: string;
+  text?: string | null;
+  imageUrl?: string | null;
   senderId: string;
+  status?: "sent" | "delivered" | "read" | "uploading";
   createdAt: any;
 };
 
@@ -74,8 +73,7 @@ type UiMessage = {
   imageH?: number;
   fromMe: boolean;
   timeLabel: string;
-  pending?: boolean;
-  error?: boolean;
+  uploading?: boolean; // derived from status
 };
 
 const normalizeDate = (val: any): Date => {
@@ -96,43 +94,26 @@ const normalizeDate = (val: any): Date => {
 const formatTime = (d: Date) =>
   d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+const isLikelyUrl = (v?: string | null) => !!v && /^https?:\/\/\S+/i.test(v);
+
 const scaleImage = (w: number, h: number) => {
-  if (!w || !h) return { w: 0, h: 0 };
+  if (!w || !h) return { w: MAX_IMAGE_WIDTH, h: FALLBACK_IMG_H };
   const ratio = w / h;
   const targetW = Math.min(w, MAX_IMAGE_WIDTH);
-  return { w: targetW, h: targetW / ratio };
+  return { w: targetW, h: Math.max(1, Math.round(targetW / ratio)) };
 };
 
-// put near your helpers
-const isLikelyUrl = (v?: string) => !!v && /^https?:\/\/\S+/i.test(v);
-
-// Upgrade text URL → image (covers signed Firebase/S3/CDNs)
-const coerceImageFromText = (m: MessageDoc) => {
-  if (m.imageUrl || !m.text) return m;
-  const t = m.text.trim();
-  let isUrl = false;
-  try {
-    const u = new URL(t);
-    isUrl = u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    isUrl = false;
-  }
-  if (!isUrl) return m;
-
-  const hasExt = /\.(png|jpe?g|webp|gif|bmp|heic|heif)(\?.*)?$/i.test(t);
-  const looksLikeCloud =
-    /firebasestorage\.googleapis\.com|googleusercontent\.com|amazonaws\.com|cloudfront\.net|supabase\.co/i.test(
-      t
-    ) || /(?:^|[?&])alt=media\b|(?:^|[?&])token=|X-Amz-Signature/i.test(t);
-
-  return hasExt || looksLikeCloud
-    ? { ...m, imageUrl: t, text: undefined as any }
-    : m;
+/** If the backend ever (incorrectly) puts a URL in text, hide it when imageUrl exists */
+const sanitizeText = (text?: string | null, imageUrl?: string | null) => {
+  if (!text) return undefined;
+  if (!imageUrl) return text;
+  if (text === imageUrl) return undefined;
+  if (isLikelyUrl(text)) return undefined;
+  return text;
 };
 
 const Bubble: React.FC<{ msg: UiMessage }> = ({ msg }) => {
-  const { fromMe, text, timeLabel, imageUrl, imageW, imageH, pending, error } =
-    msg;
+  const { fromMe, text, timeLabel, imageUrl, imageW, imageH, uploading } = msg;
   const finalW = imageUrl ? imageW || MAX_IMAGE_WIDTH : 0;
   const finalH = imageUrl ? imageH || FALLBACK_IMG_H : 0;
 
@@ -147,23 +128,16 @@ const Bubble: React.FC<{ msg: UiMessage }> = ({ msg }) => {
           <View style={{ position: "relative", marginBottom: text ? 8 : 0 }}>
             <Image
               source={{ uri: imageUrl }}
-              style={{ width: finalW, height: finalH, borderRadius: 12 }}
-              onError={() => {}}
+              style={{
+                width: finalW,
+                height: finalH,
+                borderRadius: 12,
+                backgroundColor: "#eee",
+              }}
             />
-            {(pending || !imageW || !imageH) && (
+            {uploading && (
               <View style={styles.overlay}>
                 <ActivityIndicator />
-              </View>
-            )}
-            {error && (
-              <View
-                style={[
-                  styles.overlay,
-                  { backgroundColor: "rgba(220,53,69,0.15)" },
-                ]}
-              >
-                <Ionicons name="alert-circle" size={20} color="#DC3545" />
-                <Text style={{ marginTop: 6, color: "#DC3545" }}>Failed</Text>
               </View>
             )}
           </View>
@@ -171,8 +145,7 @@ const Bubble: React.FC<{ msg: UiMessage }> = ({ msg }) => {
         {!!text && <Text style={styles.bubbleText}>{text}</Text>}
         <Text style={styles.bubbleMeta}>
           {timeLabel}
-          {pending && " • Sending"}
-          {error && " • Error"}
+          {uploading ? " • Uploading…" : ""}
         </Text>
       </View>
     </View>
@@ -201,15 +174,9 @@ const Chat: React.FC = () => {
   const [headerHeight, setHeaderHeight] = useState(0);
 
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [optimistic, setOptimistic] = useState<UiMessage[]>([]);
+  const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sendingImage, setSendingImage] = useState(false);
-  const [input, setInput] = useState("");
-
-  const listData = useMemo(
-    () => [...messages, ...optimistic],
-    [messages, optimistic]
-  );
 
   // bootstrap me
   useEffect(() => {
@@ -230,7 +197,7 @@ const Chat: React.FC = () => {
     };
   }, []);
 
-  // peer header
+  // header peer info
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -252,7 +219,7 @@ const Chat: React.FC = () => {
     markConversationRead(conversationId).catch(() => {});
   }, [conversationId]);
 
-  // subscribe to messages
+  // subscribe to messages (single source of truth, no local optimistic needed)
   useEffect(() => {
     if (!conversationId || !me) return;
     let unsub: null | (() => void) = null;
@@ -260,52 +227,51 @@ const Chat: React.FC = () => {
     const res = (Msg as any).listenToMessages(
       conversationId,
       async (docs: MessageDoc[]) => {
+        // Map to UI; keep patient behavior for images
         const mapped = await Promise.all(
-          docs.map(async (_m) => {
-            const m = coerceImageFromText(_m); // keep as a safety net
+          docs.map(async (m) => {
             const d = normalizeDate(m.createdAt);
-
-            // ⚠️ strip url-ish text when imageUrl is present, or when text equals the image url
-            const textIsUrl = isLikelyUrl(m.text);
-            const safeText =
-              m.imageUrl && (textIsUrl || m.text === m.imageUrl)
-                ? undefined
-                : m.text;
+            const safeText = sanitizeText(m.text, m.imageUrl);
 
             let imageW: number | undefined;
             let imageH: number | undefined;
+
             if (m.imageUrl) {
               try {
-                const { w, h } = await new Promise<{ w: number; h: number }>(
+                const dims = await new Promise<{ w: number; h: number }>(
                   (resolve, reject) =>
                     Image.getSize(
                       m.imageUrl!,
                       (w, h) => resolve({ w, h }),
-                      reject
+                      // fallback dimensions if remote HEAD fails
+                      () => resolve({ w: MAX_IMAGE_WIDTH, h: FALLBACK_IMG_H })
                     )
                 );
-                const s = scaleImage(w, h);
+                const s = scaleImage(dims.w, dims.h);
                 imageW = s.w;
                 imageH = s.h;
-              } catch {}
+              } catch {
+                imageW = MAX_IMAGE_WIDTH;
+                imageH = FALLBACK_IMG_H;
+              }
             }
 
             return {
               id: m.id,
-              text: safeText, // ← use sanitized text
-              imageUrl: m.imageUrl,
+              text: safeText,
+              imageUrl: m.imageUrl ?? undefined,
               imageW,
               imageH,
               fromMe: m.senderId === me.userId,
               timeLabel: formatTime(d),
+              uploading: m.status === "uploading" && !m.imageUrl,
               _ts: d.getTime(),
             } as UiMessage & { _ts: number };
           })
         );
 
-        mapped.sort((a, b) => a._ts - b._ts); // ascending for inverted list
+        mapped.sort((a, b) => b._ts - a._ts);
         setMessages(mapped.map(({ _ts, ...u }) => u));
-        if (optimistic.length) setOptimistic([]);
       }
     );
 
@@ -313,30 +279,36 @@ const Chat: React.FC = () => {
     return () => {
       if (unsub) unsub();
     };
-  }, [conversationId, me, optimistic.length]);
+  }, [conversationId, me]);
 
-  // auto-scroll
+  // auto-scroll to latest (top because list is inverted)
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, [listData]);
+  }, [messages]);
 
-  // send text
+  // send text (strictly text → never put URL in text)
   const onSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || !conversationId) return;
+    if (!text || !conversationId || !me) return;
     setSending(true);
     Keyboard.dismiss();
     try {
-      const res = await (Msg as any).sendTextMessage(conversationId, text);
-      if (!res?.success)
+      const res = await (Msg as any).sendTextMessage(
+        conversationId,
+        me.userId,
+        text
+      );
+      if (!res?.success) {
         Alert.alert("Chat", res?.message || "Failed to send message");
-      else setInput("");
+      } else {
+        setInput("");
+      }
     } catch (e: any) {
       Alert.alert("Chat", e?.message || "Failed to send message");
     } finally {
       setSending(false);
     }
-  }, [conversationId, input]);
+  }, [conversationId, input, me]);
 
   // permissions
   const ensureMediaPermission = async () => {
@@ -359,242 +331,59 @@ const Chat: React.FC = () => {
     return true;
   };
 
-  // —— Upload (Blob first, then base64) ————————————————————————————————
-  const guessMimeFromName = (name: string) => {
-    const lower = name.toLowerCase();
-    if (lower.endsWith(".png")) return "image/png";
-    if (lower.endsWith(".webp")) return "image/webp";
-    if (lower.endsWith(".gif")) return "image/gif";
-    if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
-    return "image/jpeg";
-  };
+  // choose & send image (patient flow delegated to service)
+  const pickAndSend = useCallback(
+    async (mode: "library" | "camera") => {
+      if (!conversationId || !me) return;
+      if (mode === "library" && !(await ensureMediaPermission())) return;
+      if (mode === "camera" && !(await ensureCameraPermission())) return;
 
-  const uploadAsset = async (localUri: string) => {
-    const nameGuess =
-      localUri.split("/").pop()?.split("?")[0] || `photo_${Date.now()}.jpg`;
-    const mime = guessMimeFromName(nameGuess);
+      try {
+        const result =
+          mode === "library"
+            ? await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                quality: 0.9,
+                exif: false,
+              })
+            : await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                quality: 0.9,
+              });
 
-    // 1) Blob path
-    try {
-      const resp = await fetch(localUri);
-      const blob = await resp.blob();
-      const up = await (uploadChatImage as any)(
-        conversationId,
-        blob as any,
-        nameGuess
-      );
-      if (
-        up?.success &&
-        typeof up.data === "string" &&
-        /^https?:\/\//i.test(up.data)
-      ) {
-        return up.data as string;
-      }
-    } catch {}
+        if (result.canceled) return;
 
-    // 2) Base64 raw
-    const b64 = await FileSystem.readAsStringAsync(localUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    try {
-      const up2 = await (uploadChatImage as any)(
-        conversationId,
-        b64 as any,
-        nameGuess
-      );
-      if (
-        up2?.success &&
-        typeof up2.data === "string" &&
-        /^https?:\/\//i.test(up2.data)
-      ) {
-        return up2.data as string;
-      }
-    } catch {}
+        const asset = result.assets?.[0];
+        const localUri = asset?.uri;
+        if (!localUri) return;
 
-    // 3) Base64 data URL
-    const dataUrl = `data:${mime};base64,${b64}`;
-    const up3 = await (uploadChatImage as any)(
-      conversationId,
-      dataUrl as any,
-      nameGuess
-    );
-    if (
-      !up3?.success ||
-      typeof up3.data !== "string" ||
-      !/^https?:\/\//i.test(up3.data)
-    ) {
-      throw new Error(up3?.message || "Upload failed (no valid download URL)");
-    }
-    return up3.data as string;
-  };
+        setSendingImage(true);
 
-  // try to send image; fallback to text URL if needed
-  const sendImageViaService = async (url: string, w?: number, h?: number) => {
-    const anyMsg = Msg as any;
-    if (typeof anyMsg.sendImageMessage === "function")
-      return anyMsg.sendImageMessage(conversationId, url, w, h);
-    if (typeof anyMsg.sendMessage === "function")
-      return anyMsg.sendMessage(conversationId, {
-        imageUrl: url,
-        imageW: w,
-        imageH: h,
-      });
-    if (typeof anyMsg.createMessage === "function")
-      return anyMsg.createMessage(conversationId, {
-        imageUrl: url,
-        imageW: w,
-        imageH: h,
-      });
-    if (typeof anyMsg.addMessage === "function")
-      return anyMsg.addMessage(conversationId, {
-        imageUrl: url,
-        imageW: w,
-        imageH: h,
-      });
-    if (typeof anyMsg.sendMediaMessage === "function")
-      return anyMsg.sendMediaMessage(conversationId, {
-        type: "image",
-        url,
-        width: w,
-        height: h,
-      });
-    if (typeof anyMsg.sendTextMessage === "function")
-      return anyMsg.sendTextMessage(conversationId, url);
-    return {
-      success: false,
-      message: "No image send function found in messages.service.",
-    };
-  };
-
-  const makeOptimistic = (localUri: string, w?: number, h?: number) => {
-    const tempId = `local-${Date.now()}`;
-    setOptimistic((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        imageUrl: localUri,
-        imageW: w || MAX_IMAGE_WIDTH,
-        imageH: h || FALLBACK_IMG_H,
-        fromMe: true,
-        timeLabel: formatTime(new Date()),
-        pending: true,
-      },
-    ]);
-    return tempId;
-  };
-
-  // pick & send
-  const onPickAndSendImage = useCallback(async () => {
-    if (!conversationId) return;
-    if (!(await ensureMediaPermission())) return;
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.9,
-        exif: false,
-      });
-      if (result.canceled) return;
-
-      const asset = result.assets?.[0];
-      const localUri = asset?.uri;
-      if (!localUri) return;
-
-      const scaled =
-        asset?.width && asset?.height
-          ? scaleImage(asset.width, asset.height)
-          : { w: MAX_IMAGE_WIDTH, h: FALLBACK_IMG_H };
-      const tempId = makeOptimistic(localUri, scaled.w, scaled.h);
-      setSendingImage(true);
-
-      const remoteUrl = await uploadAsset(localUri);
-
-      let w = asset?.width || 0,
-        h = asset?.height || 0;
-      if (!w || !h) {
-        try {
-          const dim = await new Promise<{ w: number; h: number }>(
-            (resolve, reject) =>
-              Image.getSize(remoteUrl, (w, h) => resolve({ w, h }), reject)
-          );
-          w = dim.w;
-          h = dim.h;
-        } catch {}
-      }
-
-      const send = await sendImageViaService(remoteUrl, w, h);
-      if (!send?.success) {
-        setOptimistic((p) =>
-          p.map((m) =>
-            m.id === tempId ? { ...m, pending: false, error: true } : m
-          )
+        // This is key: the service will
+        // 1) create a message with status: "uploading"
+        // 2) upload the blob
+        // 3) patch message with imageUrl + status: "sent"
+        const send = await (Msg as any).sendImageMessage(
+          conversationId,
+          me.userId,
+          localUri,
+          "image/jpeg"
         );
-        throw new Error(send?.message || "Failed to send image");
+
+        if (!send?.success) {
+          throw new Error(send?.message || "Failed to send image");
+        }
+        // No optimistic management needed; the live listener will render the "uploading" bubble immediately.
+      } catch (e: any) {
+        Alert.alert("Image", e?.message || "Failed to send image");
+      } finally {
+        setSendingImage(false);
       }
-      setOptimistic((p) => p.filter((m) => m.id !== tempId));
-    } catch (e: any) {
-      Alert.alert("Image", e?.message || "Failed to send image");
-    } finally {
-      setSendingImage(false);
-    }
-  }, [conversationId]);
-
-  // capture & send
-  const onCaptureAndSendImage = useCallback(async () => {
-    if (!conversationId) return;
-    if (!(await ensureCameraPermission())) return;
-
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.9,
-      });
-      if (result.canceled) return;
-
-      const asset = result.assets?.[0];
-      const localUri = asset?.uri;
-      if (!localUri) return;
-
-      const scaled =
-        asset?.width && asset?.height
-          ? scaleImage(asset.width, asset.height)
-          : { w: MAX_IMAGE_WIDTH, h: FALLBACK_IMG_H };
-      const tempId = makeOptimistic(localUri, scaled.w, scaled.h);
-      setSendingImage(true);
-
-      const remoteUrl = await uploadAsset(localUri);
-
-      let w = asset?.width || 0,
-        h = asset?.height || 0;
-      if (!w || !h) {
-        try {
-          const dim = await new Promise<{ w: number; h: number }>(
-            (resolve, reject) =>
-              Image.getSize(remoteUrl, (w, h) => resolve({ w, h }), reject)
-          );
-          w = dim.w;
-          h = dim.h;
-        } catch {}
-      }
-
-      const send = await sendImageViaService(remoteUrl, w, h);
-      if (!send?.success) {
-        setOptimistic((p) =>
-          p.map((m) =>
-            m.id === tempId ? { ...m, pending: false, error: true } : m
-          )
-        );
-        throw new Error(send?.message || "Failed to send image");
-      }
-      setOptimistic((p) => p.filter((m) => m.id !== tempId));
-    } catch (e: any) {
-      Alert.alert("Camera", e?.message || "Failed to send image");
-    } finally {
-      setSendingImage(false);
-    }
-  }, [conversationId]);
+    },
+    [conversationId, me]
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: UiMessage }) => <Bubble msg={item} />,
@@ -632,7 +421,7 @@ const Chat: React.FC = () => {
       >
         <FlatList
           ref={listRef}
-          data={listData}
+          data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.chatContent}
@@ -649,7 +438,7 @@ const Chat: React.FC = () => {
         >
           <Pressable
             style={styles.circleBtn}
-            onPress={onPickAndSendImage}
+            onPress={() => pickAndSend("library")}
             disabled={sendingImage}
           >
             {sendingImage ? (
@@ -661,7 +450,7 @@ const Chat: React.FC = () => {
 
           <Pressable
             style={styles.circleBtn}
-            onPress={onCaptureAndSendImage}
+            onPress={() => pickAndSend("camera")}
             disabled={sendingImage}
           >
             <Ionicons name="camera-outline" size={22} color="#111" />
@@ -677,6 +466,7 @@ const Chat: React.FC = () => {
               onSubmitEditing={onSend}
               returnKeyType="send"
               editable={!sending}
+              blurOnSubmit={false}
             />
           </View>
 

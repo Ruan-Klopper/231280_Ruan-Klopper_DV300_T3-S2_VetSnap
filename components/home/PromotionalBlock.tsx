@@ -1,3 +1,4 @@
+// PromotionalBlock.tsx
 import React from "react";
 import {
   View,
@@ -5,19 +6,22 @@ import {
   ImageBackground,
   StyleSheet,
   Pressable,
+  ImageSourcePropType,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
-interface PromotionalBlockProps {
-  image: string;
+type PromotionalBlockProps = {
+  image: ImageSourcePropType | string; // allow both
   title: string;
-}
+};
 
 const PromotionalBlock = ({ image, title }: PromotionalBlockProps) => {
+  const src = typeof image === "string" ? { uri: image } : image;
+
   return (
     <ImageBackground
-      source={{ uri: image }}
+      source={src}
       style={styles.card}
       imageStyle={{ borderRadius: 20 }}
     >
@@ -28,15 +32,12 @@ const PromotionalBlock = ({ image, title }: PromotionalBlockProps) => {
         style={styles.overlay}
       />
       <View style={styles.content}>
-        {/* Top Row: Brand + Arrow */}
         <View style={styles.topRow}>
           <Text style={styles.brand}>VetSnap+</Text>
           <Pressable style={styles.arrow}>
             <Ionicons name="arrow-forward" size={24} color="#000" />
           </Pressable>
         </View>
-
-        {/* Bottom: Title */}
         <Text style={styles.title}>{title}</Text>
       </View>
     </ImageBackground>

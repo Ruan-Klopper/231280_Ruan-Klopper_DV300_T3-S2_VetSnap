@@ -247,10 +247,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     // ── Default for other variants (1 & 2): keep your existing actions
     return (
       <View style={styles.rightSection}>
-        {/* Example: notifications */}
-        <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
+        {/* Example: notifications: To be implemented in the future */}
+        {/* <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
           <Ionicons name="notifications-outline" size={24} color="white" />
-        </Pressable>
+        </Pressable> */}
 
         {/* Example: profile (tabs or fallback) */}
         <Pressable style={styles.profileButton} onPress={goProfile}>
