@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db, storage } from "../../config/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { postSendUpdateConversation } from "./conversations.service";
 
 // ---- Types ----
 export type MessageDoc = {
@@ -63,6 +64,14 @@ export async function sendTextMessage(
       status: "sent",
       createdAt: serverTimestamp(),
     });
+
+    // 👇 keep the conversation in sync
+    await postSendUpdateConversation(conversationId, {
+      text: text ?? "",
+      imageUrl: null,
+      senderId,
+    });
+
     return ok(true);
   } catch (e: any) {
     return fail(e?.message ?? "Failed to send text");
@@ -77,7 +86,6 @@ export async function sendImageMessage(
   contentType = "image/jpeg"
 ) {
   try {
-    // 1) Pre-create a message with status: uploading
     const msgRef = await addDoc(collection(db, CONV, conversationId, MSGS), {
       senderId,
       text: null,
@@ -86,23 +94,26 @@ export async function sendImageMessage(
       createdAt: serverTimestamp(),
     });
 
-    // 2) Convert local URI to Blob (Expo/RN-friendly)
     const blob = await (await fetch(localImageUri)).blob();
 
-    // 3) Upload to Storage (resumable)
     const sref = ref(storage, `chat_images/${conversationId}/${msgRef.id}`);
     const task = uploadBytesResumable(sref, blob, { contentType });
-
     await new Promise<void>((resolve, reject) => {
       task.on("state_changed", undefined, reject, () => resolve());
     });
 
     const url = await getDownloadURL(task.snapshot.ref);
 
-    // 4) Patch message with final imageUrl + status: sent
     await updateDoc(doc(db, CONV, conversationId, MSGS, msgRef.id), {
       imageUrl: url,
       status: "sent",
+    });
+
+    // 👇 keep the conversation in sync
+    await postSendUpdateConversation(conversationId, {
+      text: "",
+      imageUrl: url,
+      senderId,
     });
 
     return ok(true);

@@ -19,7 +19,6 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 // Auth
 import { GetCurrentUserData } from "../services/auth/authService";
 
-// Chat services (import directly; or export from a barrel if you prefer)
 // Chat services
 import {
   listenToConversations,
@@ -52,6 +51,7 @@ type RootStackParamList = {
 const AllChats: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
   // ----- local state
   const [me, setMe] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,12 +66,18 @@ const AllChats: React.FC = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const convUnsub = useRef<(() => void) | null>(null);
 
-  // Presence map (userId -> { online, lastSeen })
   // Presence map (userId -> presence doc or null)
   const [presenceMap, setPresenceMap] = useState<
     Map<string, UserPresenceDoc | null>
   >(new Map());
   const presenceUnsub = useRef<(() => void) | null>(null);
+
+  // ----- utils
+  const formatTime = (ts: any) => {
+    if (!ts) return "";
+    const d = typeof ts?.toDate === "function" ? ts.toDate() : new Date(ts);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
 
   // ----- bootstrap: get current user
   useEffect(() => {
@@ -103,12 +109,11 @@ const AllChats: React.FC = () => {
     const run = async () => {
       try {
         vetsLoading.current = true;
-        const res = await listVets(vetQuery);
+        const res = await listVets(vetQuery.trim());
         if (!mounted) return;
 
         if (!res.success || !res.data) {
-          // silently ignore and keep old state
-          return;
+          return; // keep old state silently
         }
         setVets(res.data);
       } finally {
@@ -116,7 +121,6 @@ const AllChats: React.FC = () => {
       }
     };
 
-    // Debounce a bit for search UX
     const t = setTimeout(run, 150);
     return () => {
       mounted = false;
@@ -128,7 +132,6 @@ const AllChats: React.FC = () => {
   useEffect(() => {
     if (!me) return;
 
-    // cleanup any existing
     if (convUnsub.current) {
       convUnsub.current();
       convUnsub.current = null;
@@ -150,13 +153,10 @@ const AllChats: React.FC = () => {
     };
   }, [me]);
 
-  // ----- presence for visible vets (optional; safe to keep if presence is enabled)
+  // ----- presence for visible vets (optional)
   useEffect(() => {
     if (!me) return;
 
-    // We want presence for:
-    // - the vets list (non‑vet users)
-    // - the other party in each conversation
     const targetIds = new Set<string>();
 
     if (me.role !== "vet") {
@@ -169,7 +169,6 @@ const AllChats: React.FC = () => {
       });
     });
 
-    // tear down previous
     if (presenceUnsub.current) {
       presenceUnsub.current();
       presenceUnsub.current = null;
@@ -197,10 +196,7 @@ const AllChats: React.FC = () => {
   }, [me, vets, conversations]);
 
   // ----- helpers
-  const myRole = me?.role;
-  const isVet = myRole === "vet";
-
-  const hasConversations = conversations && conversations.length > 0;
+  const isVet = me?.role === "vet";
 
   const getUnreadFor = (c: Conversation, uid: string) =>
     ((c as any)?.unread?.[uid] ?? 0) as number;
@@ -222,7 +218,6 @@ const AllChats: React.FC = () => {
       return;
     }
 
-    // Optional hints for header
     const vet = vets.find((v) => v.userId === vetId);
 
     try {
@@ -244,14 +239,10 @@ const AllChats: React.FC = () => {
     const otherId =
       (conv.members as string[]).find((m) => m !== me?.userId) || "";
 
-    // Optional hints for header (works for non‑vet users where vets[] is loaded)
     const hint = vets.find((v) => v.userId === otherId);
 
     try {
       // @ts-ignore
-      console.log("opening");
-      console.log(conv.id);
-
       navigation.navigate("Chat", {
         conversationId: conv.id,
         otherUserId: otherId,
@@ -263,11 +254,9 @@ const AllChats: React.FC = () => {
     }
   };
 
-  // Get the "other" participant id for a conversation
   const getOtherId = (c: Conversation, myId: string) =>
     (c.members as string[]).find((m) => m !== myId) || "";
 
-  // Resolve name & avatar from vets list first, then from cache, otherwise fallback
   const getDisplayForUser = useCallback(
     (uid: string): { name: string; avatarUrl: string } => {
       const vet = vets.find((v) => v.userId === uid);
@@ -285,14 +274,12 @@ const AllChats: React.FC = () => {
   useEffect(() => {
     if (!me) return;
 
-    // collect all other participant ids
     const ids = new Set<string>();
     conversations.forEach((c) => {
       const other = getOtherId(c, me.userId);
       if (other) ids.add(other);
     });
 
-    // exclude any we already have from vets or cache
     const alreadyHave = new Set<string>([
       ...vets.map((v) => v.userId),
       ...Array.from(userCache.keys()),
@@ -303,7 +290,6 @@ const AllChats: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        // Lazy import to avoid circular deps if any
         const { getUserById } = await import("../services/user/user.service");
         const results = await Promise.all(toFetch.map((id) => getUserById(id)));
         const next = new Map(userCache);
@@ -324,7 +310,7 @@ const AllChats: React.FC = () => {
   }, [me, conversations, vets, userCache]);
 
   // ----- Render
-  if (loading) {
+  if (loading || !me) {
     return (
       <View
         style={[
@@ -366,23 +352,20 @@ const AllChats: React.FC = () => {
               </View>
             </View>
 
-            {/* Vet list (from Firestore) */}
             <View style={styles.chatItemContainer}>
               {vets.length === 0 ? (
                 <Text style={{ opacity: 0.6 }}>No veterinarians found.</Text>
               ) : (
-                vets.map((v) => {
-                  const pres = presenceMap.get(v.userId);
-                  return (
-                    <NewChatItem
-                      key={v.userId}
-                      name={v.fullName}
-                      position={v.vetProfile?.clinicName || "Veterinarian"}
-                      imageUrl={v.photoURL ?? ""} // ensure string
-                      onPress={() => handleStartChat(v.userId)}
-                    />
-                  );
-                })
+                vets.map((v) => (
+                  <NewChatItem
+                    key={v.userId}
+                    name={v.fullName}
+                    position={v.vetProfile?.clinicName || "Veterinarian"}
+                    imageUrl={v.photoURL ?? ""} // ensure string
+                    // online={!!presenceMap.get(v.userId)?.online} // enable if your component supports it
+                    onPress={() => handleStartChat(v.userId)}
+                  />
+                ))
               )}
             </View>
           </View>
@@ -408,12 +391,12 @@ const AllChats: React.FC = () => {
             ) : (
               unreadConversations.map((c) => {
                 const otherId =
-                  (c.members as string[]).find((m) => m !== me?.userId) || "";
+                  (c.members as string[]).find((m) => m !== me.userId) || "";
 
                 const lastText =
-                  c.lastMessage?.text ||
-                  (c.lastMessage?.imageUrl ? "📷 Image" : "");
-                const time = "13:11"; // format if you want
+                  c.lastMessage?.text?.trim() ||
+                  (c.lastMessage?.imageUrl ? "📷 Image" : "No messages yet");
+                const time = formatTime(c.lastMessage?.createdAt);
                 const { name, avatarUrl } = getDisplayForUser(otherId);
 
                 return (
@@ -441,22 +424,22 @@ const AllChats: React.FC = () => {
           <View style={styles.header}>
             <View>
               <Text style={styles.subtitle}>Your chats</Text>
-              <Text style={styles.heading}>All Chats</Text>
+              <Text style={styles.heading}>Read chats</Text>
             </View>
           </View>
 
           <View style={styles.chatItemContainer}>
-            {!hasConversations ? (
-              <Text style={{ opacity: 0.6 }}>You have no current chats.</Text>
+            {readConversations.length === 0 ? (
+              <Text style={{ opacity: 0.6 }}>No read chats yet.</Text>
             ) : (
               readConversations.map((c) => {
                 const otherId =
-                  (c.members as string[]).find((m) => m !== me?.userId) || "";
+                  (c.members as string[]).find((m) => m !== me.userId) || "";
 
                 const lastText =
-                  c.lastMessage?.text ||
-                  (c.lastMessage?.imageUrl ? "📷 Image" : "");
-                const time = "03:00"; // format if you want
+                  c.lastMessage?.text?.trim() ||
+                  (c.lastMessage?.imageUrl ? "📷 Image" : "No messages yet");
+                const time = formatTime(c.lastMessage?.createdAt);
                 const { name, avatarUrl } = getDisplayForUser(otherId);
 
                 return (
