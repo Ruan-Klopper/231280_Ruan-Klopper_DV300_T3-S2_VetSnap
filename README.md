@@ -24,8 +24,8 @@
   <a href="https://github.com/your_username/vetsnap"><strong>Explore the Docs »</strong></a>  
   <br><br>
   <a href="https://youtu.be/pPDbJClmXk0?si=cq_Mqk5_NBrsEm-7">📱 View Demo</a> ·
-  <a href="https://github.com/your_username/vetsnap/issues">🐞 Report Bug</a> ·
-  <a href="https://github.com/your_username/vetsnap/issues">✨ Request Feature</a>
+  <a href="https://github.com/Ruan-Klopper/vetsnap/issues">🐞 Report Bug</a> ·
+  <a href="https://github.com/Ruan-Klopper/vetsnap/issues">✨ Request Feature</a>
 </p>
 
 ---
@@ -72,7 +72,7 @@ Because critical knowledge and alerts need to be instant, reliable, and accessib
 
 ---
 
-## 🎥 Demo Video
+## Demo Video
 
 <p align="center">
   <a href="https://youtu.be/pPDbJClmXk0?si=cq_Mqk5_NBrsEm-7">
@@ -84,7 +84,7 @@ Because critical knowledge and alerts need to be instant, reliable, and accessib
 
 ---
 
-## 🚀 Features
+## Features
 
 ### Authentication & User Profiles
 
@@ -104,7 +104,7 @@ Because critical knowledge and alerts need to be instant, reliable, and accessib
 
 ---
 
-## 🛠 Built With
+## Built With
 
 * [React Native (Expo)](https://expo.dev/)
 * [Firebase (Auth, Firestore, Storage, RTDB)](https://firebase.google.com/)
@@ -114,7 +114,7 @@ Because critical knowledge and alerts need to be instant, reliable, and accessib
 
 ---
 
-## ⚡ Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -137,7 +137,7 @@ npm install -g expo-cli
 
 ---
 
-## 📲 Usage
+## Usage
 
 * 👨‍🌾 Farmers: Post outbreak alerts & stay informed with **Pulse**
 * 🩺 Veterinarians: Chat directly with farmers, share knowledge
@@ -145,16 +145,13 @@ npm install -g expo-cli
 
 ---
 
-🎨 Mockups
-
-✨ A glimpse into VetSnap — designed with clarity, simplicity, and one-hand usability in mind.
-Below you’ll find the main overview followed by each core feature screen.
+## Mockups
 
 <p align="center"> <img src="readme/main.png" alt="VetSnap Main Screens" width="1000"> <br> <em>✨ The complete VetSnap experience — all core screens together.</em> </p>
 <p align="center"> <img src="readme/articles.png" alt="Anipedia Articles" width="800"> <br> <em>📚 Learn Something — Browse and read rich articles powered by Anipedia.</em> </p> <p align="center"> <img src="readme/chat.png" alt="VetSnap TalkToVet" width="800"> <br> <em>💬 TalkToVet — Real-time chat with veterinarians, including image sharing.</em> </p> <p align="center"> <img src="readme/pulses.png" alt="VetSnap Pulse" width="800"> <br> <em>📡 VetSnap Pulse — Stay updated with outbreaks, weather alerts, and community news.</em> </p>
 ---
 
-## 🗺 Roadmap
+## Roadmap
 
 * [ ] Group conversations
 * [ ] Offline article caching
@@ -163,7 +160,7 @@ Below you’ll find the main overview followed by each core feature screen.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -173,13 +170,13 @@ Below you’ll find the main overview followed by each core feature screen.
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the MIT License. See `LICENSE` for details.
 
 ---
 
-## 📬 Contact
+## Contact
 
 * ![Name](https://img.shields.io/badge/Name-Ruan%20Klopper-blue?style=flat-square)
 * ![Email](https://img.shields.io/badge/Email-ruan%40ruanklopper.com-red?style=flat-square\&logo=gmail) [ruan@ruanklopper.com](mailto:ruan@ruanklopper.com)
@@ -190,13 +187,12 @@ Distributed under the MIT License. See `LICENSE` for details.
 
 ---
 
-## 🙏 Acknowledgements
+## Acknowledgements
 
 * [Sanity.io](https://sanity.io)
 * [Firebase](https://firebase.google.com)
 * [Expo](https://expo.dev)
 * [Shields.io](https://shields.io)
-* [Font Awesome](https://fontawesome.com)
 * [Open Window Institute](https://www.openwindow.co.za/)
 
 ---
