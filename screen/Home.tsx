@@ -18,7 +18,15 @@ import promoImage2 from "../assets/images/vetsnap+2.png";
 import { GetCurrentUserData } from "../services/auth/authService";
 
 const HeaderComponents = () => {
-  const [username, setUsername] = useState("Ruan");
+  React.useEffect(() => {
+    (async () => {
+      const res = await GetCurrentUserData();
+      if (res.success) {
+        setUsername(res.data?.fullName);
+      }
+    })();
+  }, []);
+  const [username, setUsername] = useState("");
   return (
     <>
       <Text style={styles.headerText}>Hey {username} 👋</Text>
@@ -47,7 +55,7 @@ const Home = () => {
   return (
     <View style={globalStyles.root}>
       {/* Header */}
-      <AppHeader title="VetSnap" />
+      <AppHeader title="VetSnap" variant={2} />
 
       {/* Content Area */}
       <AppContentGroup
