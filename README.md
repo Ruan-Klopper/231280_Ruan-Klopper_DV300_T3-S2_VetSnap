@@ -2,12 +2,12 @@
 
 <!-- PROJECT SHIELDS -->
 
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
+\[!\[Contributors]\[contributors-shield]]\[contributors-url]
+\[!\[Forks]\[forks-shield]]\[forks-url]
+\[!\[Stargazers]\[stars-shield]]\[stars-url]
+\[!\[Issues]\[issues-shield]]\[issues-url]
+\[!\[MIT License]\[license-shield]]\[license-url]
+\[!\[LinkedIn]\[linkedin-shield]]\[linkedin-url]
 
 ---
 
@@ -23,7 +23,7 @@
 <p align="center">
   <a href="https://github.com/your_username/vetsnap"><strong>Explore the Docs »</strong></a>  
   <br><br>
-  <a href="#">📱 View Demo</a> ·
+  <a href="https://youtu.be/pPDbJClmXk0?si=cq_Mqk5_NBrsEm-7">📱 View Demo</a> ·
   <a href="https://github.com/your_username/vetsnap/issues">🐞 Report Bug</a> ·
   <a href="https://github.com/your_username/vetsnap/issues">✨ Request Feature</a>
 </p>
@@ -43,6 +43,7 @@
 ## 📖 Table of Contents
 
 * [About The Project](#about-the-project)
+* [Demo Video](#demo-video)
 * [Features](#features)
 * [Built With](#built-with)
 * [Getting Started](#getting-started)
@@ -57,13 +58,30 @@
 ---
 
 📌 About The Project
-<p align="center"> <img src="readme/main.png" alt="VetSnap Main Overview" width="900"> <br> <em>✨ VetSnap brings veterinary knowledge, alerts, and communication together in one app.</em> </p>
+
+<p align="center"> 
+  <img src="readme/main.png" alt="VetSnap Main Overview" width="900"> <br>  
+  <em>✨ VetSnap brings veterinary knowledge, alerts, and communication together in one app.</em> 
+</p>  
 
 VetSnap is a mobile app built for farmers, veterinarians, and researchers in Southern Africa.
 It unifies veterinary education (Anipedia), real-time outbreak alerts (Pulse), and direct communication with vets (TalkToVet) into one seamless tool.
 
-💡 Why VetSnap?
+💡 **Why VetSnap?**
 Because critical knowledge and alerts need to be instant, reliable, and accessible — even with one hand.
+
+---
+
+## 🎥 Demo Video
+
+<p align="center">
+  <a href="https://youtu.be/pPDbJClmXk0?si=cq_Mqk5_NBrsEm-7">
+    <img src="https://img.youtube.com/vi/pPDbJClmXk0/maxresdefault.jpg" alt="VetSnap Demo Video" width="800">
+  </a>  
+  <br>  
+  <em>▶ Click above to watch the full VetSnap demo video.</em>  
+</p>  
+
 ---
 
 ## 🚀 Features
