@@ -4,9 +4,8 @@ import { createClient } from "@sanity/client";
 import imageUrlBuilder from "@sanity/image-url";
 import { Article } from "./interfaces";
 
-// Setup client & builder
 const sanityClient = createClient({
-  projectId: "lx0o1rgf", // replace with your actual project ID
+  projectId: "lx0o1rgf",
   dataset: "production",
   apiVersion: "2024-01-01",
   useCdn: true,

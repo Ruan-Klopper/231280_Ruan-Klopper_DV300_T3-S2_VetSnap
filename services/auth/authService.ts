@@ -64,7 +64,6 @@ function baseError<T>(
 }
 
 function toPublicUserPayload(u: AppUser) {
-  // trim or shape as needed per endpoint
   return {
     userId: u.userId,
     fullName: u.fullName,
@@ -134,7 +133,7 @@ export async function SignUpUser(params: {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     console.log("[SignUpUser] Auth user created:", cred.user.uid);
 
-    // Step 2: Upload profile image if provided
+    // Step 2: Upload profile image if provided, can be null
     let photoURL: string | null = null;
     if (imageUri) {
       console.log("[SignUpUser] Uploading profile image...");
@@ -228,15 +227,7 @@ export async function SignInUser(params: {
   }
 }
 
-// ---------- 4.3 SignInOrUpWithGoogle ----------
-/**
- * Expo Flow (recommended):
- * - Use expo-auth-session to get Google idToken (and optionally accessToken)
- * - Call this method with { idToken }
- *
- * If you prefer to run the AuthSession here, create a small googleAuth.ts adapter
- * and call it before invoking this function.
- */
+// ---------- 4.3 SignInOrUpWithGoogle (Future integration, Google Client IDs is a nightmare) ----------
 export async function SignInOrUpWithGoogle(params: {
   idToken: string; // from Expo AuthSession
   accessToken?: string; // optional
@@ -305,10 +296,8 @@ export async function ResetPassword(params: {
 export async function Logout(): Promise<ApiResponse<null>> {
   try {
     await signOut(auth);
-    // (optional) update presence offline here
     return baseSuccess(204, "Logged out");
   } catch {
-    // Even if signOut fails network-wise, the local state is usually cleared.
     return baseSuccess(204, "Logged out");
   }
 }

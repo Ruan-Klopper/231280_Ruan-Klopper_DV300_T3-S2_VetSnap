@@ -3,28 +3,28 @@
 export type PulseCategory = "alert" | "tips" | "suggestion";
 
 export interface PulseMedia {
-  photoUrl?: string | null; // single image (optional)
+  photoUrl?: string | null;
 }
 
 export interface PulsePost {
-  id: string; // Firestore doc id
+  id: string;
   authorId: string;
-  title: string; // 4–120 chars
-  description?: string; // ≤ 2000 chars
+  title: string;
+  description?: string;
   category: PulseCategory; // "alert" | "tips" | "suggestion"
   media?: PulseMedia;
   edited: boolean;
-  createdAt: any; // Firestore Timestamp
-  updatedAt: any; // Firestore Timestamp
+  createdAt: any;
+  updatedAt: any;
 
-  // Optional server-owned (add when enabling "Top Pulses")
+  // Future integration, currently here for ease of implementation
   pulseCount?: number;
   lastActivityAt?: any;
 }
 
 export interface PulseReaction {
-  userId: string; // subdoc id == uid
-  createdAt: any; // Firestore Timestamp
+  userId: string;
+  createdAt: any;
 }
 
 export interface PulseAggregates {
@@ -35,7 +35,7 @@ export interface PulseAggregates {
 // Stream contracts
 export interface PulseListPage {
   items: PulsePost[];
-  cursor: any | null; // last visible doc (QueryDocumentSnapshot) or null
+  cursor: any | null;
 }
 
 export interface ToggleResult {

@@ -144,7 +144,7 @@ export async function createPost(params: {
 export async function updatePost(params: {
   postId: string;
   changes: Partial<Pick<PulsePost, "title" | "description" | "category">>;
-  replacePhotoWithUri?: string | null; // string = new file; null = remove photo; undefined = no change
+  replacePhotoWithUri?: string | null;
 }): Promise<ApiResponse<{ postId: string }>> {
   try {
     const current = auth.currentUser;
@@ -266,7 +266,7 @@ export async function getPost(
 
 // ---------- B) LISTS & REALTIME ----------
 
-type SortMode = "Recent" | "Top"; // "Top" only if pulseCount enabled
+type SortMode = "Recent" | "Top"; // "Top" only if pulseCount enabled, not integrated to screen component, will integrate in the future
 
 export function subscribeAllPosts(
   opts: {

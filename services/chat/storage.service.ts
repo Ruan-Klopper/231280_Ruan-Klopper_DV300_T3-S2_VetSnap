@@ -24,13 +24,7 @@ export const uploadChatImageResumable = async (
     const uploadTask = uploadBytesResumable(sref, blob, { contentType });
 
     await new Promise<void>((resolve, reject) => {
-      uploadTask.on(
-        "state_changed",
-        // (snap) => { /* you can surface progress: snap.bytesTransferred / snap.totalBytes */ },
-        undefined,
-        reject,
-        () => resolve()
-      );
+      uploadTask.on("state_changed", undefined, reject, () => resolve());
     });
 
     const url = await getDownloadURL(uploadTask.snapshot.ref);

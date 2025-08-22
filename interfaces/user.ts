@@ -41,4 +41,4 @@ export interface AppUser {
   audit: UserAudit;
 }
 
-// Need to add savedArticles table
+// Need to add savedArticles table - future integration

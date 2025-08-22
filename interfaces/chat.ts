@@ -1,6 +1,6 @@
 export interface Conversation {
   id: string;
-  members: string[]; // always includes vet + user
+  members: string[];
   lastMessage?: {
     text?: string;
     imageUrl?: string;

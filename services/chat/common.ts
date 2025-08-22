@@ -6,7 +6,6 @@ export const USERS_COL = "users";
 export const CONV_COL = "conversations";
 export const MSGS_SUB = "messages";
 
-// Use named generic functions to avoid JSX ambiguity in any config
 export function ok<T>(
   data: T,
   message = "OK",

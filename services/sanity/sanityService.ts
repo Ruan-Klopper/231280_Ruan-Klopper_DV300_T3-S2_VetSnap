@@ -50,14 +50,10 @@ export const filterArticles = (
 
 export async function getArticleById(id: string): Promise<ApiResponse<any>> {
   try {
-    console.log("🟡 getArticleById() called with id:", id);
-
     // build query string with the id interpolated
     const query = GET_ARTICLE_BY_ID(id);
-    console.log("🟡 GROQ Query String:", query);
 
     const data = await sanityClient.fetch(query);
-    console.log("🟢 Sanity fetch result:", data);
 
     if (!data) {
       return { success: false, statusCode: 404, message: "Not found" };
@@ -65,7 +61,6 @@ export async function getArticleById(id: string): Promise<ApiResponse<any>> {
 
     return { success: true, statusCode: 200, message: "OK", data };
   } catch (err: any) {
-    console.error("🔴 Sanity fetch error:", err?.message || err);
     return {
       success: false,
       statusCode: 500,
