@@ -22,7 +22,12 @@ export function mapFirebaseErrorToHttp(e: unknown): {
     case "auth/too-many-requests":
       return { statusCode: 429, message: "Too many requests" };
     case "permission-denied":
-      return { statusCode: 403, message: "Forbidden" };
+    case "firestore/permission-denied":
+      return { statusCode: 403, message: "Permission denied - check Firestore security rules" };
+    case "unavailable":
+      return { statusCode: 503, message: "Service temporarily unavailable" };
+    case "unauthenticated":
+      return { statusCode: 401, message: "Not authenticated" };
     default:
       return { statusCode: 500, message: e.message || "Internal error" };
   }

@@ -21,6 +21,7 @@ type AppNavigationProps = {
     key: TabKey;
     icon: keyof typeof Ionicons.glyphMap;
     navigateTo: string;
+    displayName?: string;
   }[];
 };
 
@@ -107,13 +108,16 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
       />
 
       <View style={[styles.container, { marginBottom: insets.bottom }]}>
-        <Animated.View style={[styles.navContainer]}>
+        <Animated.View style={styles.navContainer}>
           {tabs.map((tab) => {
             const isActive = tab.key === activeTab;
             const backgroundColor = animations[tab.key].interpolate({
               inputRange: [0, 1],
               outputRange: ["transparent", "#518649"],
             });
+
+            // Use small screen sizes globally
+            const iconSize = isActive ? 22 : 16;
 
             return (
               <Animated.View
@@ -123,7 +127,12 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
                   {
                     backgroundColor,
                     flexDirection: "row",
-                    paddingHorizontal: isActive ? 12 : 0,
+                    paddingHorizontal: isActive ? 6 : 0,
+                    flex: 1,
+                    flexShrink: isActive ? 0 : 1,
+                    maxWidth: isActive ? "32%" : "14%",
+                    minWidth: isActive ? undefined : 38,
+                    height: !isActive ? 44 : 50,
                   },
                 ]}
               >
@@ -137,12 +146,16 @@ const AppNavigation: React.FC<AppNavigationProps> = ({
                 >
                   <Ionicons
                     name={tab.icon}
-                    size={24}
+                    size={iconSize}
                     color={isActive ? "#FFFFFF" : "#518649"}
                   />
                   {isActive && (
-                    <Animated.Text style={styles.tabLabel}>
-                      {tab.displayName}
+                    <Animated.Text
+                      style={[styles.tabLabel, styles.tabLabelSmall]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {tab.displayName || tab.key}
                     </Animated.Text>
                   )}
                 </Pressable>
@@ -177,7 +190,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 35,
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "space-around",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
@@ -186,27 +199,38 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 200,
     padding: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
   },
   iconButton: {
-    minWidth: 60,
+    minWidth: 50,
     height: 50,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    flexShrink: 1,
   },
   pressableArea: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingVertical: 6,
+    minWidth: 0,
+    flexShrink: 0, // Don't shrink the pressable area
+    flexGrow: 0, // Don't grow the pressable area, let parent handle it
   },
   tabLabel: {
     color: "#fff",
     fontWeight: "900",
     fontSize: 16,
-    marginLeft: 14,
+    marginLeft: 8,
     marginBottom: 2,
+  },
+  tabLabelSmall: {
+    fontSize: 14,
+    marginLeft: 5,
+    flexShrink: 1,
   },
 });

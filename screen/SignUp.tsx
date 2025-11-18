@@ -199,7 +199,7 @@ const SignUp = () => {
         </View>
 
         <Text style={styles.welcome}>Welcome to</Text>
-        <Text style={styles.appName}>VetSnap</Text>
+        <Text style={styles.appName}>Anipedia</Text>
 
         {/* STEP 1: Role Selection */}
         <Text style={styles.label}>Select your role</Text>

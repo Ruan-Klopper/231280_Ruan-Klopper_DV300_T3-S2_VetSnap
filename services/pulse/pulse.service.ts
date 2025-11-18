@@ -119,10 +119,12 @@ export async function createPost(params: {
       photoUrl = await uploadPulseImage(newRef.id, params.localPhotoUri);
     }
 
+    // Build payload, only including description if it has a value
+    const trimmedDescription = (params.description ?? "").trim();
     const payload: Omit<PulsePost, "id"> = {
       authorId: params.authorId,
       title: params.title.trim(),
-      description: (params.description ?? "").trim() || undefined,
+      ...(trimmedDescription && { description: trimmedDescription }),
       category: params.category,
       media: photoUrl ? { photoUrl } : {},
       edited: false,
@@ -189,20 +191,28 @@ export async function updatePost(params: {
       mediaUpdates = { media: { photoUrl: newUrl } };
     }
 
+    // Build updates object, only including fields that have values
     const updates: Record<string, any> = {
-      ...("title" in params.changes
-        ? { title: params.changes.title?.trim() }
-        : {}),
-      ...("description" in params.changes
-        ? { description: params.changes.description?.trim() || undefined }
-        : {}),
-      ...("category" in params.changes
-        ? { category: params.changes.category }
-        : {}),
       ...(mediaUpdates ?? {}),
       edited: true,
       updatedAt: serverTimestamp(),
     };
+
+    // Only add description if it has a value (omit if empty)
+    if ("description" in params.changes) {
+      const trimmedDesc = params.changes.description?.trim();
+      if (trimmedDesc) {
+        updates.description = trimmedDesc;
+      }
+    }
+
+    // Add other fields if they exist
+    if ("title" in params.changes && params.changes.title) {
+      updates.title = params.changes.title.trim();
+    }
+    if ("category" in params.changes && params.changes.category) {
+      updates.category = params.changes.category;
+    }
 
     await updateDoc(refDoc, updates);
     return baseSuccess(200, "Pulse updated", { postId: params.postId });

@@ -97,7 +97,7 @@ const SignIn = () => {
       </View>
 
       <Text style={styles.welcome}>Welcome back to</Text>
-      <Text style={styles.appName}>VetSnap</Text>
+      <Text style={styles.appName}>Anipedia</Text>
 
       {/* Email */}
       <Text style={styles.label}>Email</Text>

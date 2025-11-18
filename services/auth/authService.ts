@@ -126,11 +126,17 @@ export async function SignUpUser(params: {
 }): Promise<ApiResponse<ReturnType<typeof toPublicUserPayload>>> {
   try {
     const { email, password, fullName, role, vetProfile, imageUri } = params;
+    // Trim email to remove any leading/trailing whitespace
+    const trimmedEmail = email.trim();
     console.log("[SignUpUser] Params:", params);
 
     // Step 1: Create auth user
     console.log("[SignUpUser] Creating Firebase auth user...");
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const cred = await createUserWithEmailAndPassword(
+      auth,
+      trimmedEmail,
+      password
+    );
     console.log("[SignUpUser] Auth user created:", cred.user.uid);
 
     // Step 2: Upload profile image if provided, can be null
@@ -148,7 +154,7 @@ export async function SignUpUser(params: {
     const userDoc: AppUser = {
       userId: cred.user.uid,
       fullName,
-      email,
+      email: trimmedEmail,
       role,
       photoURL,
       preferences: DEFAULT_PREFS,
@@ -159,7 +165,22 @@ export async function SignUpUser(params: {
       fcmTokens: [],
     };
     console.log("[SignUpUser] Writing user document to Firestore:", userDoc);
-    await setDoc(doc(db, "users", cred.user.uid), userDoc);
+    try {
+      await setDoc(doc(db, "users", cred.user.uid), userDoc);
+      console.log("[SignUpUser] User document written successfully");
+    } catch (firestoreError: any) {
+      console.error(
+        "[SignUpUser] Failed to write user document:",
+        firestoreError
+      );
+      // If Firestore write fails, we should still return an error
+      // but the auth user is already created, so this is a partial failure
+      throw new Error(
+        `Failed to create user profile: ${
+          firestoreError?.message || "Unknown error"
+        }`
+      );
+    }
 
     // Step 4: If vet, also create veterinarians/{uid}
     if (role === "vet") {
@@ -199,7 +220,9 @@ export async function SignInUser(params: {
 }): Promise<ApiResponse<ReturnType<typeof toPublicUserPayload>>> {
   try {
     const { email, password } = params;
-    const cred = await signInWithEmailAndPassword(auth, email, password);
+    // Trim email to remove any leading/trailing whitespace
+    const trimmedEmail = email.trim();
+    const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
 
     const ref = doc(db, "users", cred.user.uid);
     const snap = await getDoc(ref);
@@ -257,14 +280,38 @@ export async function SignInOrUpWithGoogle(params: {
 export async function GetCurrentUserData(): Promise<ApiResponse<AppUser>> {
   try {
     const current = auth.currentUser;
-    if (!current) return baseError(401, "Not authenticated");
+    if (!current) {
+      console.error("[GetCurrentUserData] No authenticated user");
+      return baseError(401, "Not authenticated");
+    }
 
+    console.log("[GetCurrentUserData] Fetching user data for:", current.uid);
     const ref = doc(db, "users", current.uid);
     const snap = await getDoc(ref);
-    if (!snap.exists()) return baseError(404, "Profile missing");
 
-    return baseSuccess(200, "OK", snap.data() as AppUser);
-  } catch (e) {
+    if (!snap.exists()) {
+      console.warn(
+        "[GetCurrentUserData] User document does not exist in Firestore, creating it..."
+      );
+      // If document doesn't exist, create it (similar to SignInUser fallback)
+      // This handles cases where auth user exists but Firestore doc is missing
+      const created = await ensureFirestoreUser(current, "self", {
+        fullName: current.displayName ?? "",
+        email: current.email ?? "",
+      });
+      console.log("[GetCurrentUserData] Created missing user document");
+      return baseSuccess(200, "OK", created);
+    }
+
+    const userData = snap.data() as AppUser;
+    console.log("[GetCurrentUserData] Successfully fetched user data");
+    return baseSuccess(200, "OK", userData);
+  } catch (e: any) {
+    console.error("[GetCurrentUserData] Error details:", {
+      code: e?.code,
+      message: e?.message,
+      stack: e?.stack,
+    });
     const { statusCode, message } = mapFirebaseErrorToHttp(e);
     return baseError(statusCode, "Failed to fetch profile", message);
   }
@@ -276,9 +323,11 @@ export async function ResetPassword(params: {
 }): Promise<ApiResponse<null>> {
   try {
     const { email } = params;
+    // Trim email to remove any leading/trailing whitespace
+    const trimmedEmail = email.trim();
     // lazy import to avoid tree shaking auth exports here
     const { sendPasswordResetEmail } = await import("firebase/auth");
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, trimmedEmail);
     return baseSuccess(
       200,
       "If an account exists, a reset email has been sent."
@@ -362,8 +411,10 @@ export async function ReauthenticateEmail(params: {
   const user = auth.currentUser;
   if (!user || !user.email) throw new Error("No active session");
 
+  // Trim email to remove any leading/trailing whitespace
+  const trimmedEmail = params.email.trim();
   const credential = EmailAuthProvider.credential(
-    params.email,
+    trimmedEmail,
     params.password
   );
   await reauthenticateWithCredential(user, credential);

@@ -1,6 +1,6 @@
 // App.tsx
-import React, { useEffect, useState } from "react";
-import { StatusBar, ActivityIndicator, View } from "react-native";
+import React, { useEffect, useState, useCallback } from "react";
+import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   NavigationContainer,
@@ -9,6 +9,7 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 // If you're using react-native-gesture-handler widely, keep this wrapper:
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import * as SplashScreen from "expo-splash-screen";
 
 // Firebase
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -25,6 +26,12 @@ import SignUp from "./screen/SignUp";
 // Navigation
 import { MainTabs } from "./navigation/MainTabs";
 
+// Components
+import CustomSplashScreen from "./components/global/SplashScreen";
+
+// Keep the native splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
+
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef();
 
@@ -32,40 +39,65 @@ export default function App() {
   const [userAuth, setIsUserAuth] = useState<boolean>(false);
   const [bootstrapping, setBootstrapping] = useState<boolean>(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [appIsReady, setAppIsReady] = useState<boolean>(false);
 
   useEffect(() => {
-    // Listen for Firebase Auth state changes
-    const unsub = onAuthStateChanged(auth, (fbUser) => {
-      setCurrentUser(fbUser);
-      setIsUserAuth(!!fbUser);
-      setBootstrapping(false);
-    });
+    let unsub: (() => void) | null = null;
 
-    return () => unsub();
+    async function prepare() {
+      try {
+        // Listen for Firebase Auth state changes
+        unsub = onAuthStateChanged(auth, (fbUser) => {
+          setCurrentUser(fbUser);
+          setIsUserAuth(!!fbUser);
+        });
+
+        // Add a minimum delay to ensure splash screen is visible
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        setBootstrapping(false);
+        setAppIsReady(true);
+
+        // Hide the native splash screen
+        await SplashScreen.hideAsync();
+      } catch (e) {
+        console.warn(e);
+        setBootstrapping(false);
+        setAppIsReady(true);
+        await SplashScreen.hideAsync();
+      }
+    }
+
+    prepare();
+
+    return () => {
+      if (unsub) {
+        unsub();
+      }
+    };
   }, []);
 
-  if (bootstrapping) {
-    // Simple splash/loading while we determine auth state
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      // This callback is called after the root view has been laid out
+      // We can hide the native splash screen here if it's still visible
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  if (bootstrapping || !appIsReady) {
+    // Show splash screen while we determine auth state
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <SafeAreaProvider>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: "#F8FDEB",
-            }}
-          >
-            <ActivityIndicator size="large" />
-          </View>
+          <CustomSplashScreen />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     );
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <SafeAreaProvider>
         <NavigationContainer ref={navRef}>
           {/* If you use expo-status-bar, import from 'expo-status-bar' instead */}

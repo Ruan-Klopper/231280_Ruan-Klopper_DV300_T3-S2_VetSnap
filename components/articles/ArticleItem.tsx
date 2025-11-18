@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Dimensions,
 } from "react-native";
 import React from "react";
 import { LinearGradient } from "expo-linear-gradient";
@@ -35,17 +36,18 @@ const ArticleItem = ({
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  // ——— local Content component (was missing) ———
-  const maxVisible = 3;
-  const visibleCategories = categories.slice(0, maxVisible);
-  const hasMore = categories.length > maxVisible;
+  const screenWidth = Dimensions.get("window").width;
+  const isSmallScreen = screenWidth < 414; // iPhone 11 Pro and smaller
 
-  const cropTitleByX = (title: string): string => {
-    const xCount = 53;
-    const cropLength = xCount > 0 ? xCount : title.length;
-    return title.length > cropLength
-      ? title.slice(0, cropLength) + "..."
-      : title;
+  // Limit number of pills displayed based on screen size
+  const maxPills = isSmallScreen ? 3 : 5;
+  const visibleCategories = categories.slice(0, maxPills);
+
+  // Truncate category text to 7 characters (only on small screens)
+  const truncateCategory = (cat: string): string => {
+    if (!isSmallScreen) return cat; // No truncation on larger screens
+    if (cat.length <= 7) return cat;
+    return cat.slice(0, 7) + "...";
   };
 
   const Content = () => (
@@ -57,18 +59,15 @@ const ArticleItem = ({
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Categories */}
+      {/* Categories - Limited to 3 on small, 5 on large */}
       <View style={styles.tagsContainer}>
         {visibleCategories.map((cat, index) => (
           <View key={`${cat}-${index}`} style={styles.tag}>
-            <Text style={styles.tagText}>{cat}</Text>
+            <Text style={styles.tagText} numberOfLines={1}>
+              {truncateCategory(cat)}
+            </Text>
           </View>
         ))}
-        {hasMore && (
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>...</Text>
-          </View>
-        )}
       </View>
 
       {/* Title + Source */}
@@ -78,7 +77,13 @@ const ArticleItem = ({
             <Text style={styles.sourceText}>{source}</Text>
           </View>
         )}
-        <Text style={styles.title}>{cropTitleByX(title)}</Text>
+        <Text
+          style={[styles.title, isSmallScreen && styles.titleSmall]}
+          numberOfLines={isSmallScreen ? 1 : 2}
+          ellipsizeMode="tail"
+        >
+          {title}
+        </Text>
       </View>
     </>
   );
@@ -133,6 +138,7 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    maxWidth: "100%",
   },
   tagText: {
     fontSize: 12,
@@ -146,6 +152,11 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 24,
     fontWeight: "bold",
+    lineHeight: 28,
+  },
+  titleSmall: {
+    fontSize: 20,
+    lineHeight: 24,
   },
   sourcePill: {
     alignSelf: "flex-start",

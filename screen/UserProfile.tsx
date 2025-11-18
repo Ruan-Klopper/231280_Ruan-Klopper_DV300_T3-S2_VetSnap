@@ -189,7 +189,7 @@ const UserProfile = ({ navigation }: any) => {
                 }}
               >
                 <Text style={[styles.optionBtnText, { color: "#444" }]}>
-                  Log out of VetSnap
+                  Log out of Anipedia
                 </Text>
               </Pressable>
               <Pressable

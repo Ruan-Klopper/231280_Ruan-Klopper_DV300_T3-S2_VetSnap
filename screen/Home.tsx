@@ -55,7 +55,7 @@ const Home = () => {
   return (
     <View style={globalStyles.root}>
       {/* Header */}
-      <AppHeader title="VetSnap" variant={2} />
+      <AppHeader title="Anipedia" variant={2} />
 
       {/* Content Area */}
       <AppContentGroup
